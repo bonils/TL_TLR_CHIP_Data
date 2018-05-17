@@ -382,9 +382,7 @@ plt.tight_layout()
 num_PCA = 4
 print('Fraction explained by the first ',str(num_PCA), 'PCAs :',sum(pca.explained_variance_ratio_[:num_PCA]))
 plt.show()
-# In[15]:
-
-
+#%%
 #Hierarchical clustering of the first 4 PCs
 list_PCAs = list(transformed.columns[:num_PCA])
 z_pca = sch.linkage(transformed.loc[:,list_PCAs],method='ward') 
@@ -394,11 +392,7 @@ c, coph_dists = cophenet(z_pca, pdist(X))
 print('cophenetic distance: ',c)
 show()
 cg_pca.savefig('clustermap_no1.svg')
-
-
-# In[16]:
-
-
+# %%
 #Plot dendrogram and get clusters based on threshold distance
 sch.dendrogram(z_pca,color_threshold=15)
 max_d = 15
@@ -406,22 +400,14 @@ clusters = fcluster(z_pca, max_d, criterion='distance')
 number_clusters = max(clusters)
 print('number of clusters based on distance of ',str(max_d), ':', str(number_clusters))
 plt.show()
-
-
-# In[18]:
-
-
+#%%
 # Append cluster number to dataframe with data
 clustered_data = norm_data.copy()
 clustered_data_nan = norm_data_nan.copy()
 cluster_series = pd.Series(clusters,index=clustered_data.index)
 clustered_data['cluster'] = cluster_series
 clustered_data_nan['cluster'] = cluster_series
-
-
-# In[26]:
-
-
+#%%
 #Replot clustergram with rows colored as above
 row_color = pd.Series(clusters,index=clustered_data.index)
 cluster_colors = ['g','r','c','m','y','k','b','orange','g','r','c','m','y','k','b']
@@ -431,11 +417,7 @@ for i in range(num_clusters):
     row_color[row_color == (i+1)] = cluster_colors[i]
 cg_pca_col = sns.clustermap(norm_data_nan,row_linkage=z_pca, col_cluster=False, cmap='coolwarm', vmin=-4,vmax=4,row_colors=row_color)
 cg_pca_col.savefig('clustermap.svg')                 
-
-
-# In[14]:
-
-
+#%%
 #Append type and sequence of TLRs
 receptors = clustered_data.index
 types = []
