@@ -53,7 +53,7 @@ def get_dG_for_scaffold(data,scaffold,conditions,row_index,column_labels,flankin
     #row_index: column to use for indexing
     #column_labels:labels for the columns of the output dataframe (list of strings)
     #flanking: the base pair flaking the TLR: default is 'normal' (string)
-    
+    data = data.copy()
     data_scaffold = data.loc[(data.old_idx == scaffold)
                                                 & (data.b_name == flanking)]
     data_scaffold = data_scaffold.set_index(row_index)
@@ -390,8 +390,8 @@ cg_pca = sns.clustermap(norm_data_nan,row_linkage=z_pca, col_cluster=False, cmap
 X = transformed.loc[:,list_PCAs]
 c, coph_dists = cophenet(z_pca, pdist(X))
 print('cophenetic distance: ',c)
-show()
-cg_pca.savefig('clustermap_no1.svg')
+plt.show()
+#cg_pca.savefig('clustermap_no1.svg')
 # %%
 #Plot dendrogram and get clusters based on threshold distance
 sch.dendrogram(z_pca,color_threshold=15)
@@ -441,11 +441,7 @@ clustered_data['receptor_type'] = types_series
 clustered_data['r_seq'] = sequence_series
 clustered_data_nan['receptor_type'] = types_series
 clustered_data_nan['r_seq'] = sequence_series
-
-
-# In[15]:
-
-
+#%%
 #separate each cluster and save in dictionary
 cluster_names = ['cluster_' + str(i) for i in range(1,number_clusters+1)]
 all_clusters = {}
@@ -457,11 +453,7 @@ for counter, names in enumerate (cluster_names):
 for clusters in all_clusters:
     s1,s2 = all_clusters[clusters].shape
     print('There are ',str(s1),' tetraloop-receptors in ', clusters)
-
-
-# In[16]:
-
-
+#%%
 #create dictionary for each cluster with original dG values before interpolation, and replacement of dG values
 # dG values are in combined_data_rearr
 cluster_names = ['cluster_' + str(i) for i in range(1,number_clusters+1)]
@@ -469,11 +461,7 @@ A = combined_data_rearr.copy()
 all_clusters_dG = {}
 for names in cluster_names:
     all_clusters_dG[names] = A.loc[all_clusters[names].index]
-
-
-# In[53]:
-
-
+#%%
 #plot data summaries for each cluster
 num_clusters = len(all_clusters)
 #variables
@@ -539,13 +527,11 @@ for counter,clusters in enumerate(sorted(all_clusters)):
     plt.ylim([0,250])
     plt.xticks([1,2,3],receptor_types)
     fig_name = 'cluster ' + str(counter + 1) + 'summary.pdf'
+    plt.show()
+#%%    
     
-
-
-# Repeat data analysis performed above but subtract WT 11ntR (reference) from each row instead of the mean of each row. 
-
-# In[28]:
-
+# Repeat data analysis performed above but subtract WT 11ntR (reference) from each 
+# row instead of the mean of each row. 
 
 #Use one row (11ntR WT) as reference: substract it from all other rows
 norm_data_Wt = prep_data.copy()
