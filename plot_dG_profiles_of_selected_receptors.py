@@ -10,16 +10,22 @@ alt_TLR_seq = 'CACGG_CCUAGA'
 
 '''Condition to compare'''
 condition = 'dG_Mut2_GAAA'  # for 30 mM Mg
+error = 'dGerr_Mut2_GAAA'
 
 '''Limits for plot figures'''
 low_lim = -14
 high_lim = -6
+
+'''Set threshold'''
+dG_threshold = -7.1
+set_threshold = False
 
 #%%
 '''Import libraries'''
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from scipy import stats
 #%%
 '''Import Data'''
 data_path = '/Users/Steve/Desktop/Data_analysis_code/Data/'
@@ -41,12 +47,26 @@ WT_11ntR = WT_11ntR.reindex(unique_scaffolds)
 alt_TLR = data_11ntR[data_11ntR.r_seq == alt_TLR_seq]
 alt_TLR = alt_TLR.set_index('old_idx')
 alt_TLR = alt_TLR.reindex(unique_scaffolds)
+
+#%%
+'''Set values above dG threshold to NAN'''
+if set_threshold:
+    cond = alt_TLR[condition].copy()
+    cond[cond>dG_threshold] = np.nan
+    alt_TLR[condition] = cond
+    del cond
+    cond = WT_11ntR[condition].copy()
+    cond[cond>dG_threshold] = np.nan
+    WT_11ntR[condition] = cond
 #%%
 '''Calculate ddG values'''
 ddG = alt_TLR[condition] - WT_11ntR[condition] 
 ddG_average = ddG.mean()
 ddG_std = ddG.std()
-
+#%%
+'''Correlation coefficient'''
+data_comb = pd.concat([alt_TLR[condition],WT_11ntR[condition]],axis = 1)
+R = data_comb.corr(method = 'pearson')
 #%%
 #Color based on the length of the CHIP piece 
 Colors = WT_11ntR.length.copy()
@@ -56,15 +76,21 @@ Colors[Colors == 10] = 'orange'
 Colors[Colors == 11] = 'black'
 #%%
 fig1 = plt.figure()
-x = [low_lim, high_lim] #for plotting  y= x line
-plt.scatter(WT_11ntR[condition],alt_TLR[condition],s=60,edgecolors='k',c=Colors)
-plt.plot(x,x,'--r')
+x = [low_lim, dG_threshold] #for plotting  y= x line
+y_thres = [dG_threshold,dG_threshold]
+x_ddG = [ddG_average + x[0],ddG_average + x[1]]
+plt.plot(x,x_ddG,'--r',linewidth = 3)
+plt.scatter(WT_11ntR[condition],alt_TLR[condition],s=120,edgecolors='k',c=Colors)
+plt.plot(x,x,':k')
+plt.plot(x,y_thres,':k',linewidth = 0.5)
+plt.plot(y_thres,x,':k',linewidth = 0.5)
 plt.xlim(low_lim,high_lim)
 plt.ylim(low_lim,high_lim)
 plt.xticks(list(range(-14,-4,2)))
 plt.yticks(list(range(-14,-4,2)))
-plt.tick_params(axis='both', which='major', labelsize=20)
+plt.tick_params(axis='both', which='major', labelsize=24)
 plt.axes().set_aspect('equal')
-plt.xlabel('$\Delta$G$^{WT}_{bind}$ (kcal/mol)',fontsize=18)
-plt.ylabel('$\Delta$G$^{alt}_{bind}$ (kcal/mol)',fontsize=18)
+plt.xlabel('$\Delta$G$^{11ntR}_{bind}$ (kcal/mol)',fontsize=22)
+plt.ylabel('$\Delta$G$^{mut}_{bind}$ (kcal/mol)',fontsize=22)
 fig1.show()
+#%%
