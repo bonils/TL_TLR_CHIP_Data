@@ -381,7 +381,7 @@ plt.ylabel('fraction of variance \nexplained by each PC', fontsize=14)
 plt.tight_layout()
 num_PCA = 4
 print('Fraction explained by the first ',str(num_PCA), 'PCAs :',sum(pca.explained_variance_ratio_[:num_PCA]))
-plt.show()
+#plt.show()
 #%%
 #Hierarchical clustering of the first 4 PCs
 list_PCAs = list(transformed.columns[:num_PCA])
@@ -390,7 +390,7 @@ cg_pca = sns.clustermap(norm_data_nan,row_linkage=z_pca, col_cluster=False, cmap
 X = transformed.loc[:,list_PCAs]
 c, coph_dists = cophenet(z_pca, pdist(X))
 print('cophenetic distance: ',c)
-plt.show()
+#plt.show()
 #cg_pca.savefig('clustermap_no1.svg')
 # %%
 #Plot dendrogram and get clusters based on threshold distance
@@ -399,7 +399,7 @@ max_d = 15
 clusters = fcluster(z_pca, max_d, criterion='distance')
 number_clusters = max(clusters)
 print('number of clusters based on distance of ',str(max_d), ':', str(number_clusters))
-plt.show()
+#plt.show()
 #%%
 # Append cluster number to dataframe with data
 clustered_data = norm_data.copy()
@@ -527,7 +527,7 @@ for counter,clusters in enumerate(sorted(all_clusters)):
     plt.ylim([0,250])
     plt.xticks([1,2,3],receptor_types)
     fig_name = 'cluster ' + str(counter + 1) + 'summary.pdf'
-    plt.show()
+    #plt.show()
 #%%    
     '''REPEAT ANALYSIS'''
 # Repeat data analysis performed above but subtract WT 11ntR (reference) from each 
@@ -554,7 +554,7 @@ plt.ylabel('fraction of variance \nexplained by each PC', fontsize=14)
 plt.tight_layout()
 num_PCA = 4
 print('Fraction explained by the first ',str(num_PCA), 'PCAs (data relative to 11ntR) :',sum(pca.explained_variance_ratio_[:num_PCA]))
-show()
+#plt.show()
 
 
 # In[29]:
@@ -567,7 +567,7 @@ cg_pca = sns.clustermap(norm_data_Wt_nan,row_linkage=z_pca, col_cluster=False, c
 X = transformed.loc[:,list_PCAs]
 c, coph_dists = cophenet(z_pca, pdist(X))
 print('cophenetic distance: ',c)
-show()
+#plt.show()
 
 
 # In[35]:
@@ -579,7 +579,7 @@ max_d = 20
 clusters = fcluster(z_pca, max_d, criterion='distance')
 number_clusters = max(clusters)
 print('number of clusters based on distance of ',str(max_d), ':', str(number_clusters))
-plt.show()
+#plt.show()
 
 
 # In[36]:
