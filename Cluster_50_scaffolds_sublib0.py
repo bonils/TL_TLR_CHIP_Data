@@ -32,6 +32,9 @@ dG_threshold = -7.1 #kcal/mol; dG values above this are not reliable
 dG_replace = -7.1 # for replacing values above threshold. 
 nan_threshold = 0.50 #amount of missing data tolerated.
 num_neighbors = 10
+#for plotting
+low_lim = -14
+high_lim = -6
 #%%
 '''---------------Import data ------------------'''
 data_path = '/Users/Steve/Desktop/Data_analysis_code/Data/'
@@ -46,6 +49,18 @@ scaffolds_length = pd.concat([sublib0['old_idx'],sublib0['length']],axis=1)
 scaffolds_length = scaffolds_length.drop_duplicates()
 scaffolds_length = scaffolds_length.sort_values(by=['length'])
 scaffolds_sublib0 = list(scaffolds_length['old_idx'])
+#%% For scatter plotting
+Color_length =scaffolds_length['length'].copy()
+Color_length[Color_length == 8] = 'red'
+Color_length[Color_length == 9] = 'blue'
+Color_length[Color_length == 10] = 'orange'
+Color_length[Color_length == 11] = 'black'
+
+#%%For scatter plotting
+for i in Color_length.index:
+    print (i)
+plot_markers = pd.Series(index = Color_length.index)
+
 #%%
 #Note: in previous datatables (e.g. all_11ntR_unique.csv) old_idx imports as a 
 # number.  However in the case of the original table 'tectorna_results_tertcontacts.180122.csv'
@@ -86,7 +101,7 @@ for scaffolds in scaffolds_sublib0:
     
 
 conditions = ['dG_Mut2_GAAA_5mM_150mMK_1']
-column_labels = ['dG_5Mg150K_GUAA']
+column_labels = ['dG_5Mg150K_GAAA']
 row_index= ('r_name')
 flanking = 'normal'
 
@@ -185,12 +200,30 @@ for clusters in all_clusters:
 
 #%%
 WT_ref = data_50_scaffolds.loc['11ntR'] 
-next_cluster = all_clusters_nan['cluster_4']
+next_cluster = all_clusters_nan['cluster_3']
 S1,S2 = next_cluster.shape
 rand_index = np.random.randint(1,S1)
 alternative_TLR = next_cluster.index[rand_index]
 alt_TLR = data_50_scaffolds.loc[alternative_TLR]
-plt.scatter(WT_ref,alt_TLR)
+
+x = [low_lim, dG_threshold] #for plotting  y= x line
+y_thres = [dG_threshold,dG_threshold]
+#x_ddG = [ddG_average + x[0],ddG_average + x[1]]
+#plt.plot(x,x_ddG,'--r',linewidth = 3)
+plt.scatter(WT_ref[0:50],alt_TLR[0:50],s=120,edgecolors='k',c=Color_length,marker='o')
+plt.scatter(WT_ref[51:100],alt_TLR[51:100],s=120,edgecolors='k',c=Color_length,marker='s')
+plt.scatter(WT_ref[101:150],alt_TLR[101:150],s=120,edgecolors='k',c=Color_length,marker='^')
+plt.plot(x,x,':k')
+plt.plot(x,y_thres,':k',linewidth = 0.5)
+plt.plot(y_thres,x,':k',linewidth = 0.5)
+plt.xlim(low_lim,high_lim)
+plt.ylim(low_lim,high_lim)
+plt.xticks(list(range(-14,-4,2)))
+plt.yticks(list(range(-14,-4,2)))
+plt.tick_params(axis='both', which='major', labelsize=24)
+plt.axes().set_aspect('equal')
+plt.xlabel('$\Delta$G$^{11ntR}_{bind}$ (kcal/mol)',fontsize=22)
+plt.ylabel('$\Delta$G$^{mut}_{bind}$ (kcal/mol)',fontsize=22)
 #%%
 '''------------PCA Analysis of normalized data-----------------'''
 #(3) Subtract the mean per row
