@@ -31,7 +31,7 @@ from clustering_functions import prep_data_for_clustering_ver2
 dG_threshold = -7.1 #kcal/mol; dG values above this are not reliable
 dG_replace = -7.1 # for replacing values above threshold. 
 nan_threshold = 0.50 #amount of missing data tolerated.
-num_neighbors = 20
+num_neighbors = 10
 #%%
 '''---------------Import data ------------------'''
 data_path = '/Users/Steve/Desktop/Data_analysis_code/Data/'
@@ -106,7 +106,7 @@ data_50_scaffolds = pd.concat([data_50_scaffolds_GAAA,data_50_scaffolds_GUAA,
 #%%
 prep_data,original_nan = prep_data_for_clustering_ver2(data_50_scaffolds,
                                                        dG_threshold,dG_replace,nan_threshold,
-                                                       num_neighbors=10)
+                                                       num_neighbors=num_neighbors)
 prep_data_with_nan = prep_data.copy()
 prep_data_with_nan[original_nan] = np.nan
 #%%
@@ -116,10 +116,10 @@ pca,transformed,loadings = doPCA(prep_data)
 pd.Series(pca.explained_variance_ratio_).plot(kind='bar')
 plt.ylabel('fraction of variance \nexplained by each PC', fontsize=14)
 plt.tight_layout()
-num_PCA = 4
+num_PCA = 5
 print('Fraction explained by the first ',str(num_PCA), 'PCAs :',sum(pca.explained_variance_ratio_[:num_PCA]))
 
-
+#%%
 list_PCAs = list(transformed.columns[:num_PCA])
 z_pca = sch.linkage(transformed.loc[:,list_PCAs],method='ward') 
 cg_pca = sns.clustermap(prep_data_with_nan,row_linkage=z_pca, col_cluster=False
@@ -129,8 +129,8 @@ c, coph_dists = cophenet(z_pca, pdist(X))
 print('cophenetic distance: ',c)
 plt.show()
 
-sch.dendrogram(z_pca,color_threshold=15)
-max_d = 15
+sch.dendrogram(z_pca,color_threshold=20)
+max_d = 20
 clusters = fcluster(z_pca, max_d, criterion='distance')
 number_clusters = max(clusters)
 print('number of clusters based on distance of ',str(max_d), ':', str(number_clusters))
@@ -148,11 +148,10 @@ num_clusters = len(cluster_series.unique())
 num_clusters
 for i in range(num_clusters):
     row_color[row_color == (i+1)] = cluster_colors[i]
-
-fig = plt.gcf()
-fig.set_size_inches(18.5, 10.5)    
+ 
 cg_pca_col = sns.clustermap(prep_data_with_nan,row_linkage=z_pca,
                             col_cluster=False, vmin=-15,vmax=-7.1,row_colors=row_color)
+
 #Append type and sequence of TLRs
 receptors = clustered_data.index
 types = []
@@ -171,7 +170,27 @@ types_series = pd.Series(types,index = clustered_data.index)
 clustered_data['receptor_type'] = types_series
 clustered_data_nan['receptor_type'] = types_series
 
-#cg_pca_col.savefig('clustermap.svg')  
+#separate each cluster and save in dictionary
+cluster_names = ['cluster_' + str(i) for i in range(1,number_clusters+1)]
+all_clusters = {}
+all_clusters_nan = {}
+for counter, names in enumerate (cluster_names):
+    all_clusters[names] = clustered_data.query('cluster==' + str(counter +1))
+    all_clusters_nan[names] = clustered_data_nan.query('cluster==' + str(counter +1))
+#how many members are in each cluster
+for clusters in all_clusters:
+    s1,s2 = all_clusters[clusters].shape
+    print('There are ',str(s1),' tetraloop-receptors in ', clusters)
+      
+
+#%%
+WT_ref = data_50_scaffolds.loc['11ntR'] 
+next_cluster = all_clusters_nan['cluster_4']
+S1,S2 = next_cluster.shape
+rand_index = np.random.randint(1,S1)
+alternative_TLR = next_cluster.index[rand_index]
+alt_TLR = data_50_scaffolds.loc[alternative_TLR]
+plt.scatter(WT_ref,alt_TLR)
 #%%
 '''------------PCA Analysis of normalized data-----------------'''
 #(3) Subtract the mean per row
@@ -196,8 +215,8 @@ c, coph_dists = cophenet(z_pca, pdist(X))
 print('cophenetic distance: ',c)
 plt.show()
 #%%
-sch.dendrogram(z_pca,color_threshold=15)
-max_d = 15
+sch.dendrogram(z_pca,color_threshold=20)
+max_d = 20
 clusters = fcluster(z_pca, max_d, criterion='distance')
 number_clusters = max(clusters)
 print('number of clusters based on distance of ',str(max_d), ':', str(number_clusters))
@@ -217,6 +236,10 @@ for i in range(num_clusters):
     row_color[row_color == (i+1)] = cluster_colors[i]
 cg_pca_col = sns.clustermap(norm_data_nan,row_linkage=z_pca,
                             col_cluster=False, vmin=-3,vmax=3,cmap='coolwarm',row_colors=row_color)
+
+
+
+
 #%%
 sublib0.to_csv('sublib0.csv')
 
