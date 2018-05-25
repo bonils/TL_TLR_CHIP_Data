@@ -44,23 +44,18 @@ print('original size of sublibrary 0: ',sublib0.shape)
 sublib0 = sublib0.drop_duplicates(subset='seq', keep="last")
 print('after deleting duplicates: ',sublib0.shape)
 #%%
+#Create list of receptors in sublibrary and list of scaffolds
 receptors_sublib0 = sorted(list(set(sublib0['r_name'])))
 scaffolds_length = pd.concat([sublib0['old_idx'],sublib0['length']],axis=1)
 scaffolds_length = scaffolds_length.drop_duplicates()
 scaffolds_length = scaffolds_length.sort_values(by=['length'])
 scaffolds_sublib0 = list(scaffolds_length['old_idx'])
-#%% For scatter plotting
+#%% Colors to used for scatter plotting
 Color_length =scaffolds_length['length'].copy()
 Color_length[Color_length == 8] = 'red'
 Color_length[Color_length == 9] = 'blue'
 Color_length[Color_length == 10] = 'orange'
 Color_length[Color_length == 11] = 'black'
-
-#%%For scatter plotting
-for i in Color_length.index:
-    print (i)
-plot_markers = pd.Series(index = Color_length.index)
-
 #%%
 #Note: in previous datatables (e.g. all_11ntR_unique.csv) old_idx imports as a 
 # number.  However in the case of the original table 'tectorna_results_tertcontacts.180122.csv'
@@ -118,7 +113,8 @@ for scaffolds in scaffolds_sublib0:
     
 data_50_scaffolds = pd.concat([data_50_scaffolds_GAAA,data_50_scaffolds_GUAA,
                                data_50_scaffolds_5Mg150K],axis = 1)
-#%%
+
+    
 prep_data,original_nan = prep_data_for_clustering_ver2(data_50_scaffolds,
                                                        dG_threshold,dG_replace,nan_threshold,
                                                        num_neighbors=num_neighbors)
@@ -131,9 +127,8 @@ pca,transformed,loadings = doPCA(prep_data)
 pd.Series(pca.explained_variance_ratio_).plot(kind='bar')
 plt.ylabel('fraction of variance \nexplained by each PC', fontsize=14)
 plt.tight_layout()
-num_PCA = 5
+num_PCA = 12
 print('Fraction explained by the first ',str(num_PCA), 'PCAs :',sum(pca.explained_variance_ratio_[:num_PCA]))
-
 #%%
 list_PCAs = list(transformed.columns[:num_PCA])
 z_pca = sch.linkage(transformed.loc[:,list_PCAs],method='ward') 
@@ -196,16 +191,14 @@ for counter, names in enumerate (cluster_names):
 for clusters in all_clusters:
     s1,s2 = all_clusters[clusters].shape
     print('There are ',str(s1),' tetraloop-receptors in ', clusters)
-      
-
 #%%
+cluster_to_plot = 'cluster_9'
 WT_ref = data_50_scaffolds.loc['11ntR'] 
-next_cluster = all_clusters_nan['cluster_3']
+next_cluster = all_clusters_nan[cluster_to_plot]
 S1,S2 = next_cluster.shape
 rand_index = np.random.randint(1,S1)
 alternative_TLR = next_cluster.index[rand_index]
 alt_TLR = data_50_scaffolds.loc[alternative_TLR]
-
 x = [low_lim, dG_threshold] #for plotting  y= x line
 y_thres = [dG_threshold,dG_threshold]
 #x_ddG = [ddG_average + x[0],ddG_average + x[1]]
@@ -224,6 +217,14 @@ plt.tick_params(axis='both', which='major', labelsize=24)
 plt.axes().set_aspect('equal')
 plt.xlabel('$\Delta$G$^{11ntR}_{bind}$ (kcal/mol)',fontsize=22)
 plt.ylabel('$\Delta$G$^{mut}_{bind}$ (kcal/mol)',fontsize=22)
+plt.savefig(cluster_to_plot + '_fig.svg')
+#%%
+#create labels ordered as clustergram
+TLR_labels = pd.DataFrame()
+TLR_labels['names'] = clustered_data.index
+TLR_labels['cluster'] = list(clustered_data.cluster)
+TLR_labels['type'] = list(clustered_data.receptor_type)
+TLR_labels = TLR_labels.reindex(cg_pca_col.dendrogram_row.reordered_ind)
 #%%
 '''------------PCA Analysis of normalized data-----------------'''
 #(3) Subtract the mean per row
