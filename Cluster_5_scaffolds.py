@@ -37,8 +37,6 @@ from scipy.cluster.hierarchy import cophenet
 from scipy.spatial.distance import pdist
 from scipy.cluster.hierarchy import fcluster
 from sklearn.neighbors import NearestNeighbors
-
-#%%
 #%%
 '''--------------Import Functions--------------''' 
 from clustering_functions import get_dG_for_scaffold
@@ -50,7 +48,7 @@ from clustering_functions import prep_data_for_clustering_ver2
 dG_threshold = -7.1 #kcal/mol; dG values above this are not reliable
 dG_replace = -7.1 # for replacing values above threshold. 
 nan_threshold = 0.50 #amount of missing data tolerated.
-num_neighbors = 20 # for interpolation
+num_neighbors = 10 # for interpolation
 #%%
 #import data from csv files 
 #Data has been separated into 11ntR, IC3, and in vitro
@@ -73,7 +71,6 @@ all_in_vitro_unique_df = pd.read_csv(data_path + 'all_in_vitro_unique.csv')
 all_in_vitro_unique_df['new_name'] = all_in_vitro_unique_df['r_name'] + '_' + all_in_vitro_unique_df['r_seq']
 unique_receptors_in_vitro = sorted(list(set(list(all_in_vitro_unique_df.new_name)))) #used for indexing
 print('# of unique in vitro receptors: '+ str(len(unique_receptors_in_vitro)))
-
 #%%
 #---------------------------PREPARE DATA FOR 11nTR TLRS--------------------------------------------
 
@@ -208,7 +205,6 @@ all_in_vitro_five_scaffolds = pd.concat([all_in_vitro_35600_dG,all_in_vitro_3531
                                        
 print(all_in_vitro_five_scaffolds.shape)
 
-
 #%%
 #Prepare data for clustering and plotting
 #(1) Combine data from all Tl/TLRs; REARRANGE COLUMNS
@@ -238,6 +234,7 @@ plt.tight_layout()
 num_PCA = 4
 print('Fraction explained by the first ',str(num_PCA), 'PCAs :',sum(pca.explained_variance_ratio_[:num_PCA]))
 #plt.show()
+plt.close()
 #%%
 #Hierarchical clustering of the first 4 PCs
 list_PCAs = list(transformed.columns[:num_PCA])
@@ -248,6 +245,7 @@ c, coph_dists = cophenet(z_pca, pdist(X))
 print('cophenetic distance: ',c)
 #plt.show()
 #cg_pca.savefig('clustermap_no1.svg')
+plt.close()
 # %%
 #Plot dendrogram and get clusters based on threshold distance
 sch.dendrogram(z_pca,color_threshold=15)

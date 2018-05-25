@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Thu May 24 15:02:43 2018
-
-@author: Steve
-"""
-
 '''--------------Import Libraries--------------------'''
 import pandas as pd
 import numpy as np
@@ -20,7 +12,6 @@ from scipy.spatial.distance import pdist
 from scipy.cluster.hierarchy import fcluster
 from sklearn.neighbors import NearestNeighbors
 
-print('import clustering functions')
 
 #Define Functions
 def get_dG_for_scaffold(data,scaffold,conditions,row_index,column_labels,flanking ='normal'):
