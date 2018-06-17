@@ -196,7 +196,7 @@ for clusters in all_clusters:
     s1,s2 = all_clusters[clusters].shape
     print('There are ',str(s1),' tetraloop-receptors in ', clusters)
 #%%
-cluster_to_plot = 'cluster_9'
+cluster_to_plot = 'cluster_7'
 WT_ref = data_50_scaffolds.loc['11ntR'] 
 next_cluster = all_clusters_nan[cluster_to_plot]
 S1,S2 = next_cluster.shape
@@ -229,3 +229,8 @@ TLR_labels['names'] = clustered_data.index
 TLR_labels['cluster'] = list(clustered_data.cluster)
 TLR_labels['type'] = list(clustered_data.receptor_type)
 TLR_labels = TLR_labels.reindex(cg_pca_col.dendrogram_row.reordered_ind)
+
+
+
+
+

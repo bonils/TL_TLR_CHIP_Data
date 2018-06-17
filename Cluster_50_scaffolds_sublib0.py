@@ -93,7 +93,24 @@ for scaffolds in scaffolds_sublib0:
                                               row_index, next_column_labels,flanking)
     next_df = next_df.reindex(receptors_sublib0)
     data_50_scaffolds_GUAA = pd.concat([data_50_scaffolds_GUAA,next_df],axis = 1)
+
+
+conditions = ['dG_Mut2_GAAA_5mM_2']
+column_labels = ['dG_5mM_Mg_GAAA']
+row_index= ('r_name')
+flanking = 'normal'
+
+data_50_scaffolds_5Mg = pd.DataFrame(index = receptors_sublib0)
+
+for scaffolds in scaffolds_sublib0:
     
+    next_scaffold = str(scaffolds)
+    next_column_labels = [name + '_' +  next_scaffold for name in column_labels]
+    next_df = get_dG_for_scaffold(data,next_scaffold,conditions, 
+                                              row_index, next_column_labels,flanking)
+    next_df = next_df.reindex(receptors_sublib0)
+    data_50_scaffolds_5Mg = pd.concat([data_50_scaffolds_5Mg,next_df],axis = 1)
+
 
 conditions = ['dG_Mut2_GAAA_5mM_150mMK_1']
 column_labels = ['dG_5Mg150K_GAAA']
@@ -112,8 +129,8 @@ for scaffolds in scaffolds_sublib0:
     data_50_scaffolds_5Mg150K = pd.concat([data_50_scaffolds_5Mg150K,next_df],axis = 1)
     
 data_50_scaffolds = pd.concat([data_50_scaffolds_GAAA,data_50_scaffolds_GUAA,
+                               data_50_scaffolds_5Mg,
                                data_50_scaffolds_5Mg150K],axis = 1)
-
     
 prep_data,original_nan = prep_data_for_clustering_ver2(data_50_scaffolds,
                                                        dG_threshold,dG_replace,nan_threshold,
@@ -121,24 +138,31 @@ prep_data,original_nan = prep_data_for_clustering_ver2(data_50_scaffolds,
 prep_data_with_nan = prep_data.copy()
 prep_data_with_nan[original_nan] = np.nan
 #%%
+#Normalized each tetraloop-receptor with respect to its mean accross columns
+mean_per_row = prep_data.mean(axis=1)
+prep_data_norm = prep_data.copy()
+prep_data_norm = prep_data_norm.sub(mean_per_row,axis=0)
+prep_data_norm_with_nan = prep_data_norm.copy()
+prep_data_norm_with_nan[original_nan] = np.nan
+#%%
 '''------------PCA Analysis of raw data-----------------'''
-pca,transformed,loadings = doPCA(prep_data)
+pca,transformed,loadings = doPCA(prep_data_norm)
 #plot explained variance by PC
 pd.Series(pca.explained_variance_ratio_).plot(kind='bar')
 plt.ylabel('fraction of variance \nexplained by each PC', fontsize=14)
 plt.tight_layout()
-num_PCA = 12
+num_PCA = 25
 print('Fraction explained by the first ',str(num_PCA), 'PCAs :',sum(pca.explained_variance_ratio_[:num_PCA]))
 #%%
 list_PCAs = list(transformed.columns[:num_PCA])
 z_pca = sch.linkage(transformed.loc[:,list_PCAs],method='ward') 
-cg_pca = sns.clustermap(prep_data_with_nan,row_linkage=z_pca, col_cluster=False
-                        , vmin=-12,vmax=-7.1)
+cg_pca = sns.clustermap(prep_data_norm_with_nan,row_linkage=z_pca, col_cluster=False
+                        , vmin=-3,vmax=3,cmap='coolwarm')
 X = transformed.loc[:,list_PCAs]
 c, coph_dists = cophenet(z_pca, pdist(X))
 print('cophenetic distance: ',c)
 plt.show()
-
+#%%
 sch.dendrogram(z_pca,color_threshold=20)
 max_d = 20
 clusters = fcluster(z_pca, max_d, criterion='distance')
@@ -159,8 +183,9 @@ num_clusters
 for i in range(num_clusters):
     row_color[row_color == (i+1)] = cluster_colors[i]
  
-cg_pca_col = sns.clustermap(prep_data_with_nan,row_linkage=z_pca,
-                            col_cluster=False, vmin=-15,vmax=-7.1,row_colors=row_color)
+cg_pca_col = sns.clustermap(prep_data_norm_with_nan,row_linkage=z_pca,
+                            col_cluster=False, vmin=-3,vmax=3,row_colors=row_color,
+                            cmap='coolwarm')
 
 #Append type and sequence of TLRs
 receptors = clustered_data.index
@@ -192,7 +217,7 @@ for clusters in all_clusters:
     s1,s2 = all_clusters[clusters].shape
     print('There are ',str(s1),' tetraloop-receptors in ', clusters)
 #%%
-cluster_to_plot = 'cluster_9'
+cluster_to_plot = 'cluster_7'
 WT_ref = data_50_scaffolds.loc['11ntR'] 
 next_cluster = all_clusters_nan[cluster_to_plot]
 S1,S2 = next_cluster.shape
@@ -206,6 +231,7 @@ y_thres = [dG_threshold,dG_threshold]
 plt.scatter(WT_ref[0:50],alt_TLR[0:50],s=120,edgecolors='k',c=Color_length,marker='o')
 plt.scatter(WT_ref[51:100],alt_TLR[51:100],s=120,edgecolors='k',c=Color_length,marker='s')
 plt.scatter(WT_ref[101:150],alt_TLR[101:150],s=120,edgecolors='k',c=Color_length,marker='^')
+plt.scatter(WT_ref[101:150],alt_TLR[151:200],s=120,edgecolors='k',c=Color_length,marker='v')
 plt.plot(x,x,':k')
 plt.plot(x,y_thres,':k',linewidth = 0.5)
 plt.plot(y_thres,x,':k',linewidth = 0.5)
@@ -217,7 +243,7 @@ plt.tick_params(axis='both', which='major', labelsize=24)
 plt.axes().set_aspect('equal')
 plt.xlabel('$\Delta$G$^{11ntR}_{bind}$ (kcal/mol)',fontsize=22)
 plt.ylabel('$\Delta$G$^{mut}_{bind}$ (kcal/mol)',fontsize=22)
-plt.savefig(cluster_to_plot + '_fig.svg')
+#plt.savefig(cluster_to_plot + '_fig.svg')
 #%%
 #create labels ordered as clustergram
 TLR_labels = pd.DataFrame()
