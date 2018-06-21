@@ -16,6 +16,13 @@ Created on Thu May 24 13:07:41 2018
 # PCA, and determine how many PCs to used for hierarchical clustering. 
 # Hierarchical clustering, using ward distance, and determine the cutoff distance.
 
+#Symbols used in scatter plots:
+#o --> 30 mM Mg, GAAA
+#s --> 30 mM Mg, GUAA
+#^ --> 5 mM Mg
+#
+
+
 #%%
 '''--------------Import Libraries--------------------'''
 import pandas as pd
@@ -229,7 +236,7 @@ for clusters in all_clusters:
     print('There are ',str(s1),' tetraloop-receptors in ', clusters)
 #%%
 '''----------------Plot a random member of cluster n-------------------'''    
-cluster_to_plot = 'cluster_2'
+cluster_to_plot = 'cluster_10'
 WT_ref = data_50_scaffolds.loc['11ntR'] 
 next_cluster = all_clusters_nan[cluster_to_plot]
 S1,S2 = next_cluster.shape
@@ -243,9 +250,9 @@ y_thres = [dG_threshold,dG_threshold]
 #x_ddG = [ddG_average + x[0],ddG_average + x[1]]
 #plt.plot(x,x_ddG,'--r',linewidth = 3)
 plt.scatter(WT_ref[0:50],alt_TLR[0:50],s=120,edgecolors='k',c=Color_length,marker='o')
-plt.scatter(WT_ref[51:100],alt_TLR[51:100],s=120,edgecolors='k',c=Color_length,marker='s')
-plt.scatter(WT_ref[101:150],alt_TLR[101:150],s=120,edgecolors='k',c=Color_length,marker='^')
-plt.scatter(WT_ref[151:200],alt_TLR[151:200],s=120,edgecolors='k',c=Color_length,marker='v')
+plt.scatter(WT_ref[50:100],alt_TLR[50:100],s=120,edgecolors='k',c=Color_length,marker='s')
+plt.scatter(WT_ref[100:150],alt_TLR[100:150],s=120,edgecolors='k',c=Color_length,marker='^')
+plt.scatter(WT_ref[150:200],alt_TLR[150:200],s=120,edgecolors='k',c=Color_length,marker='*')
 plt.plot(x,x,':k')
 plt.plot(x,y_thres,':k',linewidth = 0.5)
 plt.plot(y_thres,x,':k',linewidth = 0.5)
@@ -262,32 +269,37 @@ plt.title(alt_TLR.name)
 #%%%
 '''-----------Plot all members of cluster n relative to 11ntR---------------'''
 cluster_to_plot = 'cluster_1'
+panels_per_figure = 4
+
 data_cluster = all_clusters_nan[cluster_to_plot]
 
 WT_ref = data_50_scaffolds.loc['11ntR']
 x = [low_lim, dG_threshold] #for plotting  y= x line
 y_thres = [dG_threshold,dG_threshold]
+s1,s2 = data_cluster.shape
+if s1%panels_per_figure > 0:
+    num_figs = int(s1/panels_per_figure) + 1
+else:
+    num_figs = int(s1/panels_per_figure)
+axes = []
 
-fig,axes = plt.subplots(3,3,sharex=True,sharey=True)
-axes = axes.ravel()
-#list_axes = list(axes)
-#flat_axes = [item for sublist in list_axes for item in sublist]
-counter = -1
-
+for i in range(num_figs):
+    fig1,axes1 = plt.subplots(2,2,sharex=True,sharey=True)
+    axes1 = axes1.ravel()
+    axes = axes + list(axes1)
 
 for counter,receptors in enumerate (data_cluster.index):
-#for i in range(1):  
     alt_TLR = data_50_scaffolds.loc[receptors]
     r_pearson = alt_TLR.corr(WT_ref)
     
     axes[counter].scatter(WT_ref[0:50],alt_TLR[0:50],s=120,edgecolors='k',c=Color_length,marker='o')
-    axes[counter].scatter(WT_ref[51:100],alt_TLR[51:100],s=120,edgecolors='k',c=Color_length,marker='s')
-    axes[counter].scatter(WT_ref[101:150],alt_TLR[101:150],s=120,edgecolors='k',c=Color_length,marker='^')
-    axes[counter].scatter(WT_ref[151:200],alt_TLR[151:200],s=120,edgecolors='k',c=Color_length,marker='v')
+    axes[counter].scatter(WT_ref[50:100],alt_TLR[50:100],s=120,edgecolors='k',c=Color_length,marker='s')
+    axes[counter].scatter(WT_ref[100:150],alt_TLR[100:150],s=120,edgecolors='k',c=Color_length,marker='^')
+    axes[counter].scatter(WT_ref[150:200],alt_TLR[150:200],s=120,edgecolors='k',c=Color_length,marker='*')
     axes[counter].plot(x,x,':k')
     axes[counter].plot(x,y_thres,':k',linewidth = 0.5)
     axes[counter].plot(y_thres,x,':k',linewidth = 0.5)
-   # axes[counter].set_aspect('equal')
+#    axes[counter].set_aspect('equal')
     axes[counter].set_xlim([low_lim,high_lim])
     axes[counter].set_ylim([low_lim,high_lim])
 #    flat_axes[counter].xticks(list(range(-14,-4,2)))
@@ -297,12 +309,53 @@ for counter,receptors in enumerate (data_cluster.index):
 #    axes[counter].set_xlabel('$\Delta$G$^{11ntR}_{bind}$ (kcal/mol)')
 #    axes[counter].set_ylabel('$\Delta$G$^{mut}_{bind}$ (kcal/mol)')
     axes[counter].set_title(alt_TLR.name)
+    r_str = 'r = ' + '{0:.2f}'.format(r_pearson)
+    axes[counter].text(-10,-14,r_str)
 plt.tight_layout()
-fig.savefig('figure1.pdf')
+#fig1.savefig('figure1.pdf')
+#fig2.savefig('figure2.pdf')
 #%%
-fig = plt.subplot
-
-
+# for each of the cluster, calculate the potassium effect 
+next_cluster = 'cluster_1'
+data_cluster = all_clusters_nan[next_cluster].copy()
+data_columns = list(data_cluster.columns)
+for receptors in data_cluster.index:
+    data_receptor = data_cluster.loc[receptors]
+    data_5Mg = data_receptor[100:150]
+    data_5Mg[data_5Mg == -7.1] = np.nan
+    data_5Mg150K = data_receptor[150:200]
+    data_5Mg150K[data_5Mg150K == -7.1] = np.nan
+    ddG_potassium = data_5Mg150K - data_5Mg.values
+    plt.figure()
+    plt.scatter(range(50),ddG_potassium)
+#%%
+# for each of the cluster, calculate magnesium decresase effect 
+next_cluster = 'cluster_3'
+data_cluster = all_clusters_nan[next_cluster].copy()
+data_columns = list(data_cluster.columns)
+for receptors in data_cluster.index:
+    data_receptor = data_cluster.loc[receptors]
+    data_5Mg = data_receptor[100:150]
+    data_5Mg[data_5Mg == -7.1] = np.nan
+    data_30Mg = data_receptor[0:50]
+    data_30Mg[data_30Mg == -7.1] = np.nan
+    ddG_Mg = data_30Mg - data_5Mg.values
+    plt.figure()
+    plt.scatter(range(50),ddG_Mg)    
+#%%    
+# for each of the cluster, calculate GAAA vs GUAA decresase effect 
+next_cluster = 'cluster_1'
+data_cluster = all_clusters_nan[next_cluster].copy()
+data_columns = list(data_cluster.columns)
+for receptors in data_cluster.index:
+    data_receptor = data_cluster.loc[receptors]
+    data_GUAA = data_receptor[50:100]
+    data_GUAA[data_GUAA == -7.1] = np.nan
+    data_30Mg = data_receptor[0:50]
+    data_30Mg[data_30Mg == -7.1] = np.nan
+    ddG_GUAA = data_30Mg - data_GUAA.values
+    plt.figure()
+    plt.scatter(range(50),ddG_GUAA)      
 #%%
 #create labels ordered as clustergram
 TLR_labels = pd.DataFrame()
