@@ -6,7 +6,7 @@ Created on Tue May 22 15:47:46 2018
 @author: Steve
 """
 '''Sequence to plot wrt to 11ntR'''
-alt_TLR_seq = 'CAUGG_CCUAAG'
+alt_TLR_seq = 'UAUGG_ACUAAG'
 
 '''Condition to compare'''
 condition = 'dG_Mut2_GAAA'  # for 30 mM Mg
@@ -17,7 +17,7 @@ low_lim = -14
 high_lim = -6
 
 '''Set threshold'''
-dG_threshold = -7.1
+dG_threshold = -7
 set_threshold = True
 
 '''plot originial or thresholded data'''

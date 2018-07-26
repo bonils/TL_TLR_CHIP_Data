@@ -142,8 +142,8 @@ c, coph_dists = cophenet(z_pca, pdist(X))
 print('cophenetic distance: ',c)
 plt.show()
 #%%
-sch.dendrogram(z_pca,color_threshold=20)
-max_d = 20
+sch.dendrogram(z_pca,color_threshold=15)
+max_d = 15
 clusters = fcluster(z_pca, max_d, criterion='distance')
 number_clusters = max(clusters)
 print('number of clusters based on distance of ',str(max_d), ':', str(number_clusters))
@@ -196,7 +196,7 @@ for clusters in all_clusters:
     s1,s2 = all_clusters[clusters].shape
     print('There are ',str(s1),' tetraloop-receptors in ', clusters)
 #%%
-cluster_to_plot = 'cluster_7'
+cluster_to_plot = 'cluster_6'
 WT_ref = data_50_scaffolds.loc['11ntR'] 
 next_cluster = all_clusters_nan[cluster_to_plot]
 S1,S2 = next_cluster.shape

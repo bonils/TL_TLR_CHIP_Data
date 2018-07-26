@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Thu May 24 13:07:41 2018
+Created on Sun Jun 24 17:00:43 2018
 
 @author: Steve
 """
+
 # Import sublibrary 0 and create a table with rows being each of the ~150 tetraloop
 # receptors and each of the columns being dG measurements.
 # Because there were 50 scaffolds for each TLR and each of these was measured
@@ -171,29 +172,31 @@ prep_data_rel11ntR_with_nan = prep_data_rel11ntR.copy()
 prep_data_rel11ntR_with_nan[original_nan] = np.nan
 #%%
 '''------------PCA Analysis of raw data-----------------'''
-pca,transformed,loadings = doPCA(prep_data_norm)
+pca,transformed,loadings = doPCA(prep_data_rel11ntR)
 #plot explained variance by PC
 pd.Series(pca.explained_variance_ratio_).plot(kind='bar')
 plt.ylabel('fraction of variance \nexplained by each PC', fontsize=14)
 plt.tight_layout()
-num_PCA = 25
+num_PCA = 12
 print('Fraction explained by the first ',str(num_PCA), 'PCAs :',sum(pca.explained_variance_ratio_[:num_PCA]))
 #%%
 list_PCAs = list(transformed.columns[:num_PCA])
 z_pca = sch.linkage(transformed.loc[:,list_PCAs],method='ward') 
-cg_pca = sns.clustermap(prep_data_with_nan,row_linkage=z_pca, col_cluster=False
-                        , vmin=-15,vmax=-7)
+cg_pca = sns.clustermap(prep_data_rel11ntR_with_nan,row_linkage=z_pca, col_cluster=False
+                        , vmin=-5,vmax=5,cmap='coolwarm')
 X = transformed.loc[:,list_PCAs]
 c, coph_dists = cophenet(z_pca, pdist(X))
 print('cophenetic distance: ',c)
 plt.show()
 #%%
-distance_threshold = 15
+distance_threshold = 20
 sch.dendrogram(z_pca,color_threshold=distance_threshold)
 max_d = distance_threshold
 clusters = fcluster(z_pca, max_d, criterion='distance')
 number_clusters = max(clusters)
 print('number of clusters based on distance of ',str(max_d), ':', str(number_clusters))
+#%%
+
 # Append cluster number to dataframe with data
 clustered_data = prep_data.copy()
 clustered_data_nan = prep_data_with_nan.copy()
@@ -209,16 +212,15 @@ num_clusters
 for i in range(num_clusters):
     row_color[row_color == (i+1)] = cluster_colors[i]
  
-cg_pca_col = sns.clustermap(prep_data_norm_with_nan,row_linkage=z_pca,
-                            col_cluster=False, vmin=-4,vmax=4,row_colors=row_color,
+cg_pca_col = sns.clustermap(prep_data_rel11ntR_with_nan,row_linkage=z_pca,
+                            col_cluster=False, vmin=-5,vmax=5,row_colors=row_color,
                             cmap='coolwarm')
 
 #Replot clustergram with dG instead of ddGs
 cg_pca_col_2 = sns.clustermap(prep_data_with_nan,row_linkage=z_pca,
                             col_cluster=False, vmin=-16,vmax=-7,row_colors=row_color)
-
 #cg_pca_col.savefig('clustermap.svg')
-
+#%%
 #Append type and sequence of TLRs
 receptors = clustered_data.index
 types = []
@@ -248,150 +250,5 @@ for counter, names in enumerate (cluster_names):
 for clusters in all_clusters:
     s1,s2 = all_clusters[clusters].shape
     print('There are ',str(s1),' tetraloop-receptors in ', clusters)
-#%%
-'''----------------Plot a random member of cluster n-------------------'''    
-cluster_to_plot = 'cluster_8'
-WT_ref = data_50_scaffolds.loc['11ntR'] 
-next_cluster = all_clusters_nan[cluster_to_plot]
-S1,S2 = next_cluster.shape
-rand_index = np.random.randint(1,S1)
-alternative_TLR = next_cluster.index[rand_index]
-alt_TLR = data_50_scaffolds.loc[alternative_TLR]
-r_pearson = alt_TLR.corr(WT_ref)
 
-x = [low_lim, dG_threshold] #for plotting  y= x line
-y_thres = [dG_threshold,dG_threshold]
-#x_ddG = [ddG_average + x[0],ddG_average + x[1]]
-#plt.plot(x,x_ddG,'--r',linewidth = 3)
-plt.scatter(WT_ref[0:50],alt_TLR[0:50],s=120,edgecolors='k',c=Color_length,marker='o')
-plt.scatter(WT_ref[50:100],alt_TLR[50:100],s=120,edgecolors='k',c=Color_length,marker='s')
-plt.scatter(WT_ref[100:150],alt_TLR[100:150],s=120,edgecolors='k',c=Color_length,marker='^')
-plt.scatter(WT_ref[150:200],alt_TLR[150:200],s=180,edgecolors='k',c=Color_length,marker='*')
-plt.plot(x,x,':k')
-plt.plot(x,y_thres,':k',linewidth = 0.5)
-plt.plot(y_thres,x,':k',linewidth = 0.5)
-plt.xlim(low_lim,high_lim)
-plt.ylim(low_lim,high_lim)
-plt.xticks(list(range(-14,-4,2)))
-plt.yticks(list(range(-14,-4,2)))
-plt.tick_params(axis='both', which='major', labelsize=24)
-plt.axes().set_aspect('equal')
-plt.xlabel('$\Delta$G$^{11ntR}_{bind}$ (kcal/mol)',fontsize=22)
-plt.ylabel('$\Delta$G$^{mut}_{bind}$ (kcal/mol)',fontsize=22)
-plt.title(alt_TLR.name)
-plt.savefig(cluster_to_plot + '.svg')
-#%%%
-'''-----------Plot all members of cluster n relative to 11ntR---------------'''
-cluster_to_plot = 'cluster_8'
-panels_per_figure = 4
 
-data_cluster = all_clusters_nan[cluster_to_plot]
-
-WT_ref = data_50_scaffolds.loc['11ntR']
-x = [low_lim, dG_threshold] #for plotting  y= x line
-y_thres = [dG_threshold,dG_threshold]
-s1,s2 = data_cluster.shape
-if s1%panels_per_figure > 0:
-    num_figs = int(s1/panels_per_figure) + 1
-else:
-    num_figs = int(s1/panels_per_figure)
-axes = []
-
-for i in range(num_figs):
-    fig1,axes1 = plt.subplots(2,2,sharex=True,sharey=True)
-    axes1 = axes1.ravel()
-    axes = axes + list(axes1)
-
-for counter,receptors in enumerate (data_cluster.index):
-    alt_TLR = data_50_scaffolds.loc[receptors]
-    r_pearson = alt_TLR.corr(WT_ref)
-    
-    axes[counter].scatter(WT_ref[0:50],alt_TLR[0:50],s=120,edgecolors='k',c=Color_length,marker='o')
-    axes[counter].scatter(WT_ref[50:100],alt_TLR[50:100],s=120,edgecolors='k',c=Color_length,marker='s')
-    axes[counter].scatter(WT_ref[100:150],alt_TLR[100:150],s=120,edgecolors='k',c=Color_length,marker='^')
-    axes[counter].scatter(WT_ref[150:200],alt_TLR[150:200],s=120,edgecolors='k',c=Color_length,marker='*')
-    axes[counter].plot(x,x,':k')
-    axes[counter].plot(x,y_thres,':k',linewidth = 0.5)
-    axes[counter].plot(y_thres,x,':k',linewidth = 0.5)
-
-    axes[counter].set_xlim([low_lim,high_lim])
-    axes[counter].set_ylim([low_lim,high_lim])
-
-    axes[counter].set_title(alt_TLR.name)
-    r_str = 'r = ' + '{0:.2f}'.format(r_pearson)
-    axes[counter].text(-10,-14,r_str)
-plt.tight_layout()
-
-#%%
-# for each of the cluster, calculate the potassium effect 
-# Plot scatter plots and histogram
-next_cluster = 'cluster_4'
-range_hist = list(np.linspace(-2.5,2.5,num=21))
-data_cluster = all_clusters_nan[next_cluster].copy()
-data_columns = list(data_cluster.columns)
-ddG_potassium = []
-for receptors in data_cluster.index:
-    data_receptor = data_cluster.loc[receptors]
-    data_5Mg = data_receptor[100:150]
-    data_5Mg[data_5Mg == -7.1] = np.nan
-    data_5Mg150K = data_receptor[150:200]
-    data_5Mg150K[data_5Mg150K == -7.1] = np.nan
-    ddG = data_5Mg150K.values - data_5Mg.values
-    ddG = list(ddG[~np.isnan(ddG)])
-    ddG_potassium = ddG_potassium + ddG
-    #ddG_potassium = data_5Mg150K - data_5Mg.values
-    #data_cluster_ddG = data_cluster_ddG + list(ddG_potassium.values)
-    #plt.figure()
-    #plt.scatter(range(50),ddG_potassium,s=120,edgecolors='k',c=Color_length,marker='o')
-    #plt.title(data_receptor.name)
-    #plt.ylim([-3,3])
-plt.hist(ddG_potassium,bins=range_hist)
-plt.ylim([0,250])
-#%%
-# for each of the cluster, calculate magnesium decresase effect 
-next_cluster = 'cluster_1'
-data_cluster = all_clusters_nan[next_cluster].copy()
-data_columns = list(data_cluster.columns)
-for receptors in data_cluster.index:
-    data_receptor = data_cluster.loc[receptors]
-    data_5Mg = data_receptor[100:150]
-    data_5Mg[data_5Mg == -7.1] = np.nan
-    data_30Mg = data_receptor[0:50]
-    data_30Mg[data_30Mg == -7.1] = np.nan
-    ddG_Mg = data_30Mg - data_5Mg.values
-    plt.figure()
-    plt.scatter(range(50),ddG_Mg,s=120,edgecolors='k',c=Color_length,marker='o')  
-    plt.title(data_receptor.name)
-#%%    
-# for each of the cluster, calculate GAAA vs GUAA decresase effect 
-next_cluster = 'cluster_3'
-data_cluster = all_clusters_nan[next_cluster].copy()
-data_columns = list(data_cluster.columns)
-for receptors in data_cluster.index:
-    data_receptor = data_cluster.loc[receptors]
-    data_GUAA = data_receptor[50:100]
-    data_GUAA[data_GUAA == -7.1] = np.nan
-    data_30Mg = data_receptor[0:50]
-    data_30Mg[data_30Mg == -7.1] = np.nan
-    ddG_GUAA = data_30Mg - data_GUAA.values
-    plt.figure()
-    plt.scatter(range(50),ddG_GUAA,s=120,edgecolors='k',c=Color_length,marker='o') 
-
-#%%
-dG_5MG = tecto_data.dG_Mut2_GAAA_5mM_2.copy()
-dG_30MG = tecto_data.dG_Mut2_GAAA.copy()
-dG_5MG150K = tecto_data.dG_Mut2_GAAA_5mM_150mMK_1
-dG_5MG[dG_5MG > -7.1] = np.nan
-dG_5MG150K[dG_5MG150K > -7.1] = np.nan
-dG_30MG[dG_30MG > -7.1] = np.nan
-#plt.scatter(dG_5MG150K,dG_30MG)
-
-ddG = dG_5MG - dG_5MG150K.values
-plt.scatter(range(27092),ddG)
-#%%
-#create labels ordered as clustergram
-TLR_labels = pd.DataFrame()
-TLR_labels['names'] = clustered_data.index
-TLR_labels['cluster'] = list(clustered_data.cluster)
-TLR_labels['type'] = list(clustered_data.receptor_type)
-TLR_labels = TLR_labels.reindex(cg_pca_col.dendrogram_row.reordered_ind)
