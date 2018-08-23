@@ -6,7 +6,7 @@ Created on Tue May 22 15:47:46 2018
 @author: Steve
 """
 '''Sequence to plot wrt to 11ntR'''
-alt_TLR_seq = 'UAUGG_ACUAAG'
+alt_TLR_seq = 'UAAGG_CCUAAG'
 
 '''Condition to compare'''
 condition = 'dG_Mut2_GAAA'  # for 30 mM Mg
@@ -126,4 +126,7 @@ else:
     fig1.show()
 
 fig1.savefig(alt_TLR_seq + '.svg')
+print('ddG_average: ' + str(ddG_average))
+print('ddG_std: ' + str(ddG_std))
+#print('R_sq taking only values within limit: ' + str(R))
 #%%

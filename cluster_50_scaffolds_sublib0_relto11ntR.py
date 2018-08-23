@@ -180,15 +180,6 @@ plt.tight_layout()
 num_PCA = 12
 print('Fraction explained by the first ',str(num_PCA), 'PCAs :',sum(pca.explained_variance_ratio_[:num_PCA]))
 #%%
-list_PCAs = list(transformed.columns[:num_PCA])
-z_pca = sch.linkage(transformed.loc[:,list_PCAs],method='ward') 
-cg_pca = sns.clustermap(prep_data_rel11ntR_with_nan,row_linkage=z_pca, col_cluster=False
-                        , vmin=-5,vmax=5,cmap='coolwarm')
-X = transformed.loc[:,list_PCAs]
-c, coph_dists = cophenet(z_pca, pdist(X))
-print('cophenetic distance: ',c)
-plt.show()
-#%%
 distance_threshold = 20
 sch.dendrogram(z_pca,color_threshold=distance_threshold)
 max_d = distance_threshold
