@@ -121,7 +121,7 @@ for variant in all_WT_variants[20:30]:
     ax.set_xlim(0.1e-9,2000e-9)
     ax.set_xscale('log')
 #%%
-variant = 17482
+variant = 12563
 fluorescence = binding_data.loc[variant]
 concentration = pd.Series([0.91e-9,2.74e-9,8.23e-9,24.7e-9,74.1e-9,222e-9,667e-9,2e-6])
 plt.figure()

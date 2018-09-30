@@ -11,14 +11,20 @@ TLR11ntR_AC = 'UAUGG_CCUACG'
 U9G = 'UAGGG_CCUAAG'
 bp_11ntR = 'UUAGG_CCUAAG'
 '''Sequence to plot wrt to 11ntR'''
-alt_TLR_seq = VC2
+alt_TLR_seq = bp_11ntR
 #maybe a favorite 'CAUGG_CCUACG'
 #'UAGGG_CCUAAG'
 
 
+color_to_plot = 'white'
+
+
 '''Condition to compare'''
-condition = 'dG_Mut2_GUAA_1'  # for 30 mM Mg
-error = 'dGerr_Mut2_GUAA_1'
+condition = 'dG_Mut2_GAAA'  # for 30 mM Mg
+error = 'dGerr_Mut2_GAAA'
+
+condition2 = 'dG_Mut2_GUAA_1'
+error2 = 'dGerr_Mut2_GUAA_1'
 
 
 #plot GUAA too??
@@ -57,6 +63,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error
 from math import sqrt
+from scipy.stats import pearsonr
 #%%
 '''Import Data'''
 data_path = '/Users/Steve/Desktop/Data_analysis_code/Data/'
@@ -105,9 +112,9 @@ alt_TLR_original = alt_TLR.copy()
 #%%
 '''Set values above dG threshold to NAN'''
 if set_threshold:
-    cond = alt_TLR[condition].copy()
+    cond = alt_TLR[condition2].copy()
     cond[cond>dG_threshold] = np.nan
-    alt_TLR[condition] = cond
+    alt_TLR[condition2] = cond
     del cond
     cond = WT_11ntR[condition].copy()
     cond[cond>dG_threshold] = np.nan
@@ -115,32 +122,35 @@ if set_threshold:
 #%%
 #ddG and correlation values are calculated based on thresholfed data
 '''Calculate ddG values'''
-ddG = alt_TLR[condition] - WT_11ntR[condition] 
+ddG = alt_TLR[condition2] - WT_11ntR[condition] 
 ddG_average = ddG.mean()
 print('ddG_avg using values < threshold: ' + str(ddG_average))
 ddG_std = ddG.std()
 
 
 #calculate ddG median taking into account all values
-ddG_2 = alt_TLR_original[condition] - WT_11ntR_original[condition]
+ddG_2 = alt_TLR_original[condition2] - WT_11ntR_original[condition]
 ddG_median = ddG_2.median()
 ddG_median_std = ddG_2.std()
 print('ddG median using all values: ' + str(ddG_median))
 
 
 '''Correlation coefficient of thresholded data'''
-data_comb = pd.concat([alt_TLR[condition],WT_11ntR[condition]],axis = 1)
+data_comb = pd.concat([alt_TLR[condition2],WT_11ntR[condition]],axis = 1)
 R = data_comb.corr(method = 'pearson')
 #calculate rmse with respect to the median
 model = WT_11ntR[condition] + ddG_median
-model_df = pd.concat([alt_TLR[condition],model],axis = 1)
+model_df = pd.concat([alt_TLR[condition2],model],axis = 1)
 model_df = model_df.dropna()
 model_df.columns = [['actual','model']]
 rms = sqrt(mean_squared_error(model_df['actual'],model_df['model']))
 '''Correlation coefficient original data'''
-data_comb_original = pd.concat([alt_TLR_original[condition],WT_11ntR_original[condition]],axis = 1)
+data_comb_original = pd.concat([alt_TLR_original[condition2],WT_11ntR_original[condition]],axis = 1)
+data_comb_original.columns = ['column_1','column_2']
 R_original = data_comb_original.corr(method = 'pearson')
-
+data_comb_original[data_comb_original>-7.1] = np.nan
+data_clean = data_comb_original.dropna()
+r,p = pearsonr(data_clean['column_1'],data_clean['column_2'])
 #%%
 #calculate RMSE
 data = alt_TLR[condition].dropna().copy()
@@ -149,10 +159,10 @@ diff = data - ddG_average
 #%%
 #Color based on the length of the CHIP piece 
 Colors = WT_11ntR.length.copy()
-Colors[Colors == 8] = 'red'
-Colors[Colors == 9] = 'blue'
-Colors[Colors == 10] = 'orange'
-Colors[Colors == 11] = 'black'
+Colors[Colors == 8] = color_to_plot#'red'
+Colors[Colors == 9] = color_to_plot#'blue'
+Colors[Colors == 10] = color_to_plot#'orange'
+Colors[Colors == 11] = color_to_plot#'black'
 
 #%%
 if plot_original:
@@ -161,7 +171,7 @@ if plot_original:
    y_thres = [dG_threshold,dG_threshold]
    x_ddG = [ddG_average + x[0],ddG_average + x[1]]
    plt.plot(x,x_ddG,'--r',linewidth = 3)
-   plt.scatter(WT_11ntR_original[condition],alt_TLR_original[condition],s=120,edgecolors='k',c=Colors)
+   plt.scatter(WT_11ntR_original[condition],alt_TLR_original[condition2],s=120,edgecolors='k',c=Colors,linewidth=2)
    plt.plot(x,x,':k')
    plt.plot(x,y_thres,':k',linewidth = 0.5)
    plt.plot(y_thres,x,':k',linewidth = 0.5)
@@ -180,7 +190,7 @@ else:
     y_thres = [dG_threshold,dG_threshold]
     x_ddG = [ddG_average + x[0],ddG_average + x[1]]
     plt.plot(x,x_ddG,'--r',linewidth = 3)
-    plt.scatter(WT_11ntR[condition],alt_TLR[condition],s=120,edgecolors='k',c=Colors)
+    plt.scatter(WT_11ntR[condition],alt_TLR[condition2],s=120,edgecolors='k',c=Colors)
     plt.plot(x,x,':k')
     plt.plot(x,y_thres,':k',linewidth = 0.5)
     plt.plot(y_thres,x,':k',linewidth = 0.5)
@@ -200,7 +210,7 @@ print('ddG_std: ' + str(ddG_std))
 #print('R_sq taking only values within limit: ' + str(R))
     
 #%%
-plt.figure()
+plt.figure(figsize=(5,5))
 wt_data = grouped_lib.get_group('UAUGG_CCUAAG')
 wt_data_l = wt_data.groupby('length')
 lengths= [8,9,10,11]
@@ -209,8 +219,8 @@ stds = []
 for length in lengths:
     medians.append(wt_data_l.get_group(length)[condition].median())
     stds.append(wt_data_l.get_group(length)[condition].std())
-plt.scatter(lengths,medians,c = 'black',marker='s', s = 80)
-plt.errorbar(lengths,medians,c = 'black',yerr=stds)
+plt.scatter(lengths,medians,marker='s', s = 160,edgecolors='k')
+plt.errorbar(lengths,medians,yerr=stds)
 
 variant_data = grouped_lib.get_group(alt_TLR_seq)
 variant_data_l = variant_data.groupby('length')
@@ -218,16 +228,19 @@ lengths= [8,9,10,11]
 medians = []
 stds = []
 for length in lengths:
-    medians.append(variant_data_l.get_group(length)[condition].median())
-    stds.append(variant_data_l.get_group(length)[condition].std())
-plt.scatter(lengths,medians,marker='s', s= 80)
-plt.errorbar(lengths,medians,yerr=stds)
-plt.xlim(7.5,11.5)
-plt.ylim(-12.5,-5.5)
+    medians.append(variant_data_l.get_group(length)[condition2].median())
+    stds.append(variant_data_l.get_group(length)[condition2].std())
+plt.scatter(lengths,medians,marker='s',c=color_to_plot, s= 160,edgecolors='k',linewidth = 2)
+plt.errorbar(lengths,medians,c='black',yerr=stds)
+#plt.xlim(7.5,11.5)
+plt.ylim(-14,-6)
+#plt.axes().set_aspect('equal')
+#plt.set_size_inches(5,5)
 
 print(rms)
 
 #%% get median dG for each of the receptors 
+plt.figure()
 all_scaffolds = list(set(wt_data['old_idx']))
 TLR_11ntR_GAAA = grouped_lib.get_group('UAUGG_CCUAAG')['dG_Mut2_GAAA']
 TLR_IC3_GAAA = grouped_lib.get_group(IC3)['dG_Mut2_GAAA']

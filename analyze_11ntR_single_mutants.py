@@ -55,6 +55,11 @@ all_scaffolds.remove(35311)
 all_scaffolds.remove(35600)
 print(len(all_scaffolds))
 all_scaffolds = [13854, 14007,14073,35311,35600] + all_scaffolds
+#%%
+#export 11ntR sequences for frequency analysis with matlab
+seq_11ntR = {'sequences':list(set(all_11ntR.r_seq))}
+sequences_11ntR_df =pd.DataFrame(seq_11ntR)
+sequences_11ntR_df.to_csv('all_11ntR_sequences.csv')
 #%% Select controls, tandem base pairs, for comparing scaffolds preferences
 print(len(all_data))
 all_data = all_data.drop_duplicates(subset = 'seq')
@@ -65,19 +70,10 @@ receptors_sublib0 = list(set(sublib_0['r_name']))
 
 tandem_receptors = []
 for receptor in receptors_sublib0:
-    if 'tandem' in receptor:
+    if ('tandem' in receptor) | ('T4' in receptor):
         tandem_receptors.append(receptor)
 
-sublib_0 = sublib_0.set_index('r_name')  
-tandem_data = sublib_0.loc[tandem_receptors]
-
-t4_td = sublib_0.loc['T4 td ']
-tandem_GG_CC = sublib_0.loc['tandem GG/CC']
-tandem_CC_GG = sublib_0.loc['tandem CC/GG']
-
-t4_td = t4_td.set_index('old_idx')
-tandem_GG_CC = tandem_GG_CC.set_index('old_idx')
-tandem_CC_GG = tandem_CC_GG.set_index('old_idx')
+sublib0_grouped = sublib_0.groupby('r_name')
 #%% Get all data in single dataframe
 data = single_11ntR_mutants
 conditions = ['dG_Mut2_GAAA']
@@ -391,12 +387,158 @@ for receptors in data_sM_11ntR.index:
         counter = 0
 figure_counter += 1        
 #fig.savefig('/Users/Steve/Desktop/Tecto_temp_figures/single_mutant_profiles_3_' + str(figure_counter) + '.svg')
-#%% PLot bar plot for figure 3
+# PLot bar plot for figure 3
 d = {'ddG_median':ddG_median_list,'ddG_std':ddG_std_list,'n':n_compared_list}
 ddG_median_df = pd.DataFrame(index=data_sM_11ntR.index,data = d)
 plt.bar(range(0,34),ddG_median_df.ddG_median,yerr=ddG_median_df.ddG_std)
 plt.ylim([-1,6])
 #plt.savefig('/Users/Steve/Desktop/Tecto_temp_figures/ddG_11ntR_sM_allGAAA.svg')
+
+#%% Plot barplot again, but this time replace values above limits by the limits
+#THIS IS THE CORRECT PLOT AS OF 09/12/2018
+columns_to_plot = data_sM_11ntR.columns[0:50]
+counter = -1
+ddG_median_list = []
+ddG_std_list = []
+n_compared_list = []
+n_list= []
+n_above_limit_list = []
+
+#if greater than limit then replace with limit for each individual!!!!
+
+for receptor in data_sM_11ntR.index[:-1]:
+    counter += 1
+    
+    #Take receptor data; replace values above threshold by threshold
+    y_data = data_sM_11ntR.loc[receptor][columns_to_plot].dropna()
+    y_data[y_data > dG_threshold] = dG_threshold
+    
+    #Take WT data and replace values above threshold by threshold
+    x_data = data_sM_11ntR.loc['UAUGG_CCUAAG'][columns_to_plot]
+    x_data[x_data > dG_threshold] = dG_threshold
+    x_data = x_data.dropna()
+    
+    #These are the scaffolds that have data in both receptor and WT
+    scaffolds_to_compare = list(set(y_data.index) & set(x_data.index))
+    y_data = y_data.reindex(scaffolds_to_compare)
+    x_data = x_data.reindex(scaffolds_to_compare) 
+    
+    #This is so that we can count the number of values that were above the ddG limit
+    limits = dG_threshold - x_data 
+    
+    #calculate_median and number of datapoints
+    ddG = y_data.subtract(x_data)
+    print(len(x_data))
+    
+    
+    ddG_above_limit = ~(ddG >= limits)
+ #   ddG[~ddG_above_limit] = limits
+    
+    
+    n_above_limit = sum(ddG_above_limit)
+    n_above_limit_list.append(n_above_limit)
+    ddG_median = ddG.median()
+    ddG_std = ddG.std()
+    ddG_median_list.append(ddG_median)
+    ddG_std_list.append(ddG_std)
+    mask = ~((x_data.isna())|(y_data.isna()))
+    n = sum(mask)
+    n_list.append(n)
+    
+    x_data[x_data > dG_threshold] = np.nan
+    y_data[y_data > dG_threshold] = np.nan
+    mask = ~((x_data.isna())|(y_data.isna()))
+    n_compared = sum(mask)
+    n_compared_list.append(n_compared)
+ddG_median_list.append(0)
+ddG_std_list.append(0)
+n_compared_list.append(np.nan)
+n_list.append(np.nan)
+n_above_limit_list.append(np.nan)
+
+d = {'ddG_median':ddG_median_list,'ddG_std':ddG_std_list,'n_above_thr':n_compared_list,'n':n_list, 'n_above_limit_list':n_above_limit_list}
+ddG_median_df = pd.DataFrame(index=data_sM_11ntR.index,data = d)
+plt.bar(range(0,34),ddG_median_df.ddG_median,yerr=ddG_median_df.ddG_std)
+plt.ylim([-1,6])
+plt.xlim(-1,34)
+#%% Compare the specificity of each single mutant
+variant_GUAA = data_sM_11ntR.loc['UAUGG_CCUAAG'][150:200]
+variant_GUAA.index = all_scaffolds
+variant_GAAA = data_sM_11ntR.loc['UAUGG_CCUAAG'][0:50]
+variant_GAAA.index = all_scaffolds
+
+specificity = variant_GAAA.subtract(variant_GUAA)
+
+
+columns_to_plot_GAAA = data_sM_11ntR.columns[0:50]
+columns_to_plot_GUAA = data_sM_11ntR.columns[150:200]
+counter = -1
+spec_median_list = [] #for specificity
+spec_std_list = []
+n_compared_list = []
+n_list= []
+n_above_limit_list = []
+
+#if greater than limit then replace with limit for each individual!!!!
+
+for receptor in data_sM_11ntR.index:
+    counter += 1
+    
+    #Take receptor data; replace values above threshold by threshold
+    y_data = data_sM_11ntR.loc[receptor][columns_to_plot_GUAA]
+    y_data.index = all_scaffolds
+    y_data = y_data.dropna()
+    y_data[y_data > dG_threshold] = dG_threshold
+    
+    #Take WT data and replace values above threshold by threshold
+    x_data = data_sM_11ntR.loc[receptor][columns_to_plot_GAAA]
+    x_data.index = all_scaffolds
+    x_data[x_data > dG_threshold] = dG_threshold
+    x_data = x_data.dropna()
+    
+    #These are the scaffolds that have data in both receptor and WT
+    scaffolds_to_compare = list(set(y_data.index) & set(x_data.index))
+    y_data = y_data.reindex(scaffolds_to_compare)
+    x_data = x_data.reindex(scaffolds_to_compare) 
+    
+    #This is so that we can count the number of values that were above the ddG limit
+    limits = dG_threshold - x_data 
+    
+    #calculate_median and number of datapoints
+    ddG = y_data.subtract(x_data)
+    print(len(x_data))
+    
+    
+    ddG_above_limit = ~(ddG >= limits)
+ #   ddG[~ddG_above_limit] = limits
+    
+    
+    n_above_limit = sum(ddG_above_limit)
+    n_above_limit_list.append(n_above_limit)
+    ddG_median = ddG.median()
+    ddG_std = ddG.std()
+    spec_median_list.append(ddG_median)
+    spec_std_list.append(ddG_std)
+    mask = ~((x_data.isna())|(y_data.isna()))
+    n = sum(mask)
+    n_list.append(n)
+    
+    x_data[x_data > dG_threshold] = np.nan
+    y_data[y_data > dG_threshold] = np.nan
+    mask = ~((x_data.isna())|(y_data.isna()))
+    n_compared = sum(mask)
+    n_compared_list.append(n_compared)
+#spec_median_list.append(0)
+#spec_std_list.append(0)
+#n_compared_list.append(np.nan)
+#n_list.append(np.nan)
+#n_above_limit_list.append(np.nan)
+
+d = {'specificity_median':spec_median_list,'specificity_std':spec_std_list,'n_above_thr':n_compared_list,'n':n_list, 'n_above_limit_list':n_above_limit_list}
+specificity_median_df = pd.DataFrame(index=data_sM_11ntR.index,data = d)
+plt.bar(range(0,34),specificity_median_df.specificity_median,yerr=specificity_median_df.specificity_std)
+plt.ylim([-1,6])
+plt.xlim(-1,34)
 #%% Write a function that calculates bootstraps pearson correlation coefficients
 #and 95% confidence interval 
 def pearson_bootsrap (x_data,y_data,n_boostraps):
@@ -438,7 +580,10 @@ def Pearson_and_confidence(x_data,y_data):
     z = math.log((1 + r)/(1-r)) * 0.5
     
     #Standard error
-    SE = 1/math.sqrt(n_compare - 3)
+    if n_compare > 3:
+        SE = 1/math.sqrt(n_compare - 3)
+    else:
+        SE = np.nan
     
     #interval in normal space
     low_z = z - (1.96 * SE)
@@ -479,8 +624,8 @@ for receptors in data_sM_11ntR.index:
     ddG = y_data['dG'].subtract(x_data['dG'])
     ddG_median = ddG.median()
     ddG_error = ddG.std()
-    if ddG_median > 4:
-        ddG_median = 4
+#    if ddG_median > 4:
+#        ddG_median = 4
     ddG_median_list.append(ddG_median)
     ddG_error_list.append(ddG_error)
     
@@ -518,7 +663,6 @@ for receptors in data_sM_11ntR.index:
         low_r_list.append(np.nan)
         high_r_list.append(np.nan)
         n_compare_list.append(len(y_data.dropna()))
-        
 R_pearson_stats['n_compared'] = n_list
 R_pearson_stats['mean_dG'] = mean_dG_list
 R_pearson_stats['bootstrap_r_mean'] = mean_r_bs_list
@@ -532,6 +676,93 @@ R_pearson_stats['r_high'] = high_r_list
 R_pearson_stats['n_comp'] = n_compare_list
 R_pearson_stats['ddG'] = ddG_median_list
 R_pearson_stats['ddG_error'] = ddG_error_list
+#%%Calculate pearson coeffs for all single mutants at 30 mM Mg
+#also do it for_comparing 30mM WT to 5 mM mutants
+R_pearson_stats_30WT_5Mut = pd.DataFrame(index = data_sM_11ntR.index)
+dG_thr = dG_threshold
+mean_r_bs_list = []
+median_r_bs_list = []
+low_r_bs_list = []
+high_r_bs_list = []
+n_list = []
+mean_dG_list = []
+ddG_median_list = []
+ddG_error_list = []
+
+r_list = []
+low_r_list = []
+high_r_list = []
+n_compare_list = []
+n_bootstraps = 1000
+WT_data_error = pd.concat([WT_data,WT_error,],axis=1)
+x_data = WT_data_error.loc[WT_data_error.index[0:50]].copy()
+x_data.columns = ['dG','error']
+for receptors in data_sM_11ntR.index:
+    #get data for mutant
+    mut_data = data_sM_11ntR.loc[receptors]
+    mut_error = error_sM_11ntR.loc[receptors]
+    mut_data_error = pd.concat([mut_data,mut_error],axis=1)
+    y_data = mut_data_error.loc[mut_data_error.index[50:100]].copy()
+    y_data.columns = ['dG','error']
+    #CALCULATE DDG_MEDIAN BEFORE APPLYING THRESHOLD
+    
+    x_data.index = all_scaffolds
+    y_data.index = all_scaffolds
+    
+    ddG = y_data['dG'].subtract(x_data['dG'])
+    ddG_median = ddG.median()
+    ddG_error = ddG.std()
+#    if ddG_median > 4:
+#        ddG_median = 4
+    ddG_median_list.append(ddG_median)
+    ddG_error_list.append(ddG_error)
+    
+    
+    ##########
+    y_data[y_data['dG']>dG_thr] = np.nan
+    ######
+    x_data[x_data['dG'] >dG_thr] = np.nan
+    ######
+    ##########
+    
+    mean_dG_list.append(y_data['dG'].mean())
+    ##########
+    if len(y_data.dropna()) > 2:
+        mean_r_bs,median_r_bs,low_r_bs,high_r_bs,n_comb = pearson_bootsrap(x_data,y_data,n_bootstraps)
+        mean_r_bs_list.append(mean_r_bs)
+        median_r_bs_list.append(median_r_bs)
+        low_r_bs_list.append(low_r_bs)
+        high_r_bs_list.append(high_r_bs)
+        n_list.append(n_comb)
+        
+        r,low_r,high_r,n_compare = Pearson_and_confidence(x_data,y_data)
+        r_list.append(r)
+        low_r_list.append(low_r)
+        high_r_list.append(high_r)
+        n_compare_list.append(n_compare)
+    else:
+        mean_r_bs_list.append(np.nan)
+        median_r_bs_list.append(np.nan)
+        low_r_bs_list.append(np.nan)
+        high_r_bs_list.append(np.nan)
+        n_list.append(len(y_data.dropna()))
+        
+        r_list.append(np.nan)
+        low_r_list.append(np.nan)
+        high_r_list.append(np.nan)
+        n_compare_list.append(len(y_data.dropna()))
+R_pearson_stats_30WT_5Mut['n_compared'] = n_list
+R_pearson_stats_30WT_5Mut['mean_dG'] = mean_dG_list
+R_pearson_stats_30WT_5Mut['bootstrap_r_mean'] = mean_r_bs_list
+R_pearson_stats_30WT_5Mut['bootstrap_r_median'] = median_r_bs_list
+R_pearson_stats_30WT_5Mut['bootstrap_r_low'] = low_r_bs_list
+R_pearson_stats_30WT_5Mut['bootstrap_r_high'] = high_r_bs_list
+
+R_pearson_stats_30WT_5Mut['r_pearson'] = r_list
+R_pearson_stats_30WT_5Mut['r_low'] = low_r_list
+R_pearson_stats_30WT_5Mut['r_high'] = high_r_list
+R_pearson_stats_30WT_5Mut['ddG'] = ddG_median_list
+R_pearson_stats_30WT_5Mut['ddG_error'] = ddG_error_list
 #%%
 colorsl = ['purple','purple','purple','yellow','yellow','yellow','orange','orange','orange',
            'yellow','yellow','yellow','red','red','red','red','red','red','yellow','yellow','yellow',
@@ -565,6 +796,66 @@ plt.show()
 c = [1,3,2,1]
 high_error = R_pearson_stats['r_high'].subtract(R_pearson_stats['r_pearson'])
 low_error = R_pearson_stats['r_pearson'].subtract(R_pearson_stats['r_low'])
+plt.errorbar(a,b,yerr=[low_error,high_error], linestyle="None",color='k',capsize=3)
+plt.show()
+plt.scatter(a,b,s=120,edgecolors='k',marker='s',c=colorsl)
+plt.ylim(-1.2,1.2)
+plt.xlim(0,5)
+plt.show()
+#%% Plot using bootstrap for 30 mM WT vs 5 mM mut
+a = R_pearson_stats_30WT_5Mut['ddG']
+b = R_pearson_stats_30WT_5Mut['bootstrap_r_mean']
+plt.scatter(a,b,s=120,edgecolors='k',marker='s',c=colorsl)
+plt.ylim(-1.2,1.2)
+plt.xlim(0,5)
+plt.show()
+c = [1,3,2,1]
+high_error = R_pearson_stats_30WT_5Mut['bootstrap_r_high'].subtract(R_pearson_stats_30WT_5Mut['bootstrap_r_mean'])
+low_error = R_pearson_stats_30WT_5Mut['bootstrap_r_mean'].subtract(R_pearson_stats_30WT_5Mut['bootstrap_r_low'])
+plt.errorbar(a,b,yerr=[low_error,high_error], linestyle="None",color='k',capsize=3)
+plt.show()
+
+b = R_pearson_stats_30WT_5Mut['r_pearson']
+#plt.scatter(a,b,s=80,edgecolors='k',marker='^',c=colorsl)
+plt.show()
+
+#plot using conventional pearson
+plt.figure()
+a = R_pearson_stats_30WT_5Mut['ddG']
+b = R_pearson_stats_30WT_5Mut['r_pearson']
+plt.scatter(a,b,s=120,edgecolors='k',marker='o',c=colorsl)
+plt.ylim(-1.2,1.2)
+plt.xlim(0,5)
+plt.show()
+c = [1,3,2,1]
+high_error = R_pearson_stats_30WT_5Mut['r_high'].subtract(R_pearson_stats_30WT_5Mut['r_pearson'])
+low_error = R_pearson_stats_30WT_5Mut['r_pearson'].subtract(R_pearson_stats_30WT_5Mut['r_low'])
+plt.errorbar(a,b,yerr=[low_error,high_error], linestyle="None",color='k',capsize=3)
+plt.show()
+
+#plot using conventional pearson
+plt.figure()
+a = R_pearson_stats['ddG']
+b = R_pearson_stats['r_pearson']
+plt.scatter(a,b,s=120,edgecolors='k',marker='o',c=colorsl)
+plt.ylim(-1.2,1.2)
+plt.xlim(0,5)
+plt.show()
+c = [1,3,2,1]
+high_error = R_pearson_stats['r_high'].subtract(R_pearson_stats['r_pearson'])
+low_error = R_pearson_stats['r_pearson'].subtract(R_pearson_stats['r_low'])
+plt.errorbar(a,b,yerr=[low_error,high_error], linestyle="None",color='k',capsize=3)
+plt.show()
+
+a = R_pearson_stats_30WT_5Mut['ddG']
+b = R_pearson_stats_30WT_5Mut['r_pearson']
+plt.scatter(a,b,s=120,edgecolors='k',marker='s',c=colorsl)
+plt.ylim(-1.2,1.2)
+plt.xlim(0,5)
+plt.show()
+c = [1,3,2,1]
+high_error = R_pearson_stats_30WT_5Mut['r_high'].subtract(R_pearson_stats_30WT_5Mut['r_pearson'])
+low_error = R_pearson_stats_30WT_5Mut['r_pearson'].subtract(R_pearson_stats_30WT_5Mut['r_low'])
 plt.errorbar(a,b,yerr=[low_error,high_error], linestyle="None",color='k',capsize=3)
 plt.show()
 #%% Look at mutants with outliers that may need to be investigated further
@@ -714,7 +1005,6 @@ for receptors in data_sM_11ntR.index:
     textstr = '$\Delta\Delta G=%.2f$\n$\mathrm{r}=%.2f$' % (ddG_avg, r_sq)
     plt.text(-9, -12, textstr, fontsize=7,
     verticalalignment='top')    
-    
 #%%PLOT Specific RECEPTOR
 high_lim = -6.5
 receptors = 'UAUGG_CCUAAG'
@@ -765,6 +1055,8 @@ plt.xlabel('$\Delta$G$^{11ntR}_{bind}$ (kcal/mol)',fontsize=22)
 plt.ylabel('$\Delta$G$^{mut}_{bind}$ (kcal/mol)',fontsize=22)
 #%% Plot profiles with respect to the length of the scaffold
 #For GAAA at 30 mM Mg
+
+plot_tandem = True
 xlim = [7.5,11.5]
 ylim = [-12,-6.5]
 plt.plot()
@@ -780,16 +1072,18 @@ for receptors in data_sM_11ntR.index:
         length_l = []
         median_l = []
         for name, group in A:
-            dG_median = group['dG'].median()
-            if dG_median > dG_thr:
-                dG_median = dG_thr
-            dG_std = group['dG'].std()
+            dG = group['dG'].copy()
+            dG[dG>dG_threshold] = dG_threshold
+            dG_median = dG.median()
+#            if dG_median > dG_thr:
+#                dG_median = dG_thr
+            dG_std = dG.std()
             length_to_plot = group['length'].median() + random.uniform(-0.07,0.07)
-            plt.scatter(length_to_plot,dG_median,c = colorsl[counter],s=30,marker='o',edgecolor = 'k')
+            plt.scatter(length_to_plot,dG_median,c = colorsl[counter],s=60,marker='o',edgecolor = 'k')
 #            plt.errorbar(group['length'].median(),dG_median,yerr = dG_std,ecolor='k')
             length_l.append(length_to_plot)
             median_l.append(dG_median)
-        plt.plot(length_l,median_l,'grey',linewidth=0.5,linestyle='dashed')
+        plt.plot(length_l,median_l,'grey',linewidth=0.75,linestyle='dashed')
         median_per_length.loc[receptors] = median_l
  
 plt.plot(xlim,[dG_thr,dG_thr],':k')
@@ -797,16 +1091,85 @@ plt.xlim(xlim[0],xlim[1])
 plt.ylim(ylim[0],ylim[1])
 plt.scatter([8,9,10,11],median_per_length.median(),marker = 's', s=120)
 
-#plot t4_td
-
-A = t4_td.groupby(by='length')
-for name, group in A:
+if plot_tandem:
+    CC_GG = sublib0_grouped.get_group('tandem CC/GG')
+    length_l = []
+    median_l = [] 
+    A = CC_GG.groupby(by = 'length')
+    for name, group in A:
+        dG = group['dG_Mut2_GAAA'].copy()
+        dG[dG>dG_threshold] = dG_threshold
+        dG_median = dG.median()
+#            if dG_median > dG_thr:
+#                dG_median = dG_thr
+        dG_std = dG.std()
+        length_to_plot = group['length'].median() + random.uniform(-0.07,0.07)
+        plt.scatter(length_to_plot,dG_median,c = colorsl[counter],s=120,marker='^',edgecolor = 'k')
+#            plt.errorbar(group['length'].median(),dG_median,yerr = dG_std,ecolor='k')
+        length_l.append(length_to_plot)
+        median_l.append(dG_median)
+    plt.plot(length_l,median_l,'black',linewidth=1.5,linestyle='dashed')
+    median_per_length.loc[receptors] = median_l
+#%% Plot tandem
+xlim = [7.5,11.5]
+ylim = [-12,-6.5]
+for receptor in tandem_receptors:
+    next_receptor = sublib0_grouped.get_group(receptor)
+    A = next_receptor.groupby('length')
     length_l = []
     median_l= []
-    dG_median = group['dG_Mut2_GAAA'].median()
+    for name, group in A:
+        dG_median = group['dG_Mut2_GAAA'].median()
+        if dG_median > dG_thr:
+            dG_median = dG_thr
+        dG_std = group['dG_Mut2_GAAA'].std() 
+        length_to_plot = name + random.uniform(-0.07,0.07)
+        plt.scatter(length_to_plot,dG_median,c = 'magenta',s=180,marker='o',edgecolor = 'k')
+        length_l.append(length_to_plot)
+        median_l.append(dG_median)
+    plt.plot(length_l,median_l,'grey',linewidth=0.5,linestyle='dashed') 
+
+plt.plot(xlim,[dG_thr,dG_thr],':k')
+plt.xlim(xlim[0],xlim[1])
+plt.ylim(ylim[0],ylim[1])
+plt.scatter([8,9,10,11],median_per_length.median(),marker = 's', s=120)
+#%%
+plt.figure()
+for receptor in tandem_receptors:
+    next_receptor = sublib0_grouped.get_group(receptor)
+    A = next_receptor.groupby('length')
+    length_l = []
+    median_l= []
+    for name, group in A:
+        dG_median = group['dG_Mut2_GUAA_1'].median()
+        if dG_median > dG_thr:
+            dG_median = dG_thr
+        dG_std = group['dG_Mut2_GUAA_1'].std()
+        print (dG_median)
+        print (dG_std)
+        print (name)  
+        length_to_plot = name + random.uniform(-0.07,0.07)
+        print(length_to_plot)
+        plt.scatter(length_to_plot,dG_median,c = 'magenta',s=180,marker='o',edgecolor = 'k')
+        length_l.append(length_to_plot)
+        median_l.append(dG_median)
+    plt.plot(length_l,median_l,'grey',linewidth=0.5,linestyle='dashed') 
+    
+plt.plot(xlim,[dG_thr,dG_thr],':k')
+plt.xlim(xlim[0],xlim[1])
+plt.ylim(ylim[0],ylim[1])
+plt.scatter([8,9,10,11],median_per_length.median(),marker = 's', s=120)    
+#%%
+control = 'tandem CC/GG'
+control = sublib0_grouped.get_group(control)   
+A = control.groupby('length')
+length_l = []
+median_l= []
+for name, group in A:
+    dG_median = group['dG_Mut2_GUAA_1'].median()
     if dG_median > dG_thr:
         dG_median = dG_thr
-    dG_std = group['dG_Mut2_GAAA'].std()
+    dG_std = group['dG_Mut2_GUAA_1'].std()
     print (dG_median)
     print (dG_std)
     print (name)  
@@ -815,53 +1178,14 @@ for name, group in A:
     plt.scatter(length_to_plot,dG_median,c = 'magenta',s=180,marker='o',edgecolor = 'k')
     length_l.append(length_to_plot)
     median_l.append(dG_median)
-plt.plot(length_l,median_l,'grey',linewidth=0.5,linestyle='dashed')  
-
-
-
-#plot tandem_CC_GG
-
-A = tandem_CC_GG.groupby(by='length')
-for name, group in A:
-    length_l = []
-    median_l= []
-    dG_median = group['dG_Mut2_GAAA'].median()
-    if dG_median > dG_thr:
-        dG_median = dG_thr
-    dG_std = group['dG_Mut2_GAAA'].std()
-    print (dG_median)
-    print (dG_std)
-    print (name)  
-    length_to_plot = name + random.uniform(-0.07,0.07)
-    print(length_to_plot)
-    plt.scatter(length_to_plot,dG_median,c = 'yellow',s=180,marker='o',edgecolor = 'k')
-    length_l.append(length_to_plot)
-    median_l.append(dG_median)
-plt.plot(length_l,median_l,'grey',linewidth=0.5,linestyle='dashed')
-
-
-
-#plot tandem_GG_CC
-
-A = tandem_GG_CC.groupby(by='length')
-for name, group in A:
-    length_l = []
-    median_l= []
-    dG_median = group['dG_Mut2_GAAA'].median()
-    if dG_median > dG_thr:
-        dG_median = dG_thr
-    dG_std = group['dG_Mut2_GAAA'].std()
-    print (dG_median)
-    print (dG_std)
-    print (name)  
-    length_to_plot = name + random.uniform(-0.07,0.07)
-    print(length_to_plot)
-    plt.scatter(length_to_plot,dG_median,c = 'blue',s=180,marker='o',edgecolor = 'k')
-    length_l.append(length_to_plot)
-    median_l.append(dG_median)
-plt.plot(length_l,median_l,'grey',linewidth=0.5,linestyle='dashed')    
+plt.plot(length_l,median_l,'grey',linewidth=0.5,linestyle='dashed') 
+plt.plot(xlim,[dG_thr,dG_thr],':k')
+plt.xlim(xlim[0],xlim[1])
+plt.ylim(ylim[0],ylim[1])
 #%% Plot profiles with respect to the length of the scaffold
 #For GUAA at 30 mM Mg
+
+plot_tandem = True
 xlim = [7.5,11.5]
 ylim = [-12,-6.5]
 plt.plot()
@@ -877,16 +1201,18 @@ for receptors in data_sM_11ntR.index:
         length_l = []
         median_l = []
         for name, group in A:
-            dG_median = group['dG'].median()
-            if dG_median > dG_thr:
-                dG_median = dG_thr
-            dG_std = group['dG'].std()
+            dG = group['dG'].copy()
+            dG[dG>dG_threshold] = dG_threshold
+            dG_median = dG.median()
+#            if dG_median > dG_thr:
+#                dG_median = dG_thr
+            dG_std = dG.std()
             length_to_plot = group['length'].median() + random.uniform(-0.07,0.07)
-            plt.scatter(length_to_plot,dG_median,c = colorsl[counter],s=30,marker='o',edgecolor = 'k')
+            plt.scatter(length_to_plot,dG_median,c = colorsl[counter],s=60,marker='o',edgecolor = 'k')
 #            plt.errorbar(group['length'].median(),dG_median,yerr = dG_std,ecolor='k')
             length_l.append(length_to_plot)
             median_l.append(dG_median)
-        plt.plot(length_l,median_l,'grey',linewidth=0.5,linestyle='dashed')
+        plt.plot(length_l,median_l,'grey',linewidth=0.75,linestyle='dashed')
         median_per_length.loc[receptors] = median_l
 
 
@@ -895,78 +1221,200 @@ plt.xlim(xlim[0],xlim[1])
 plt.ylim(ylim[0],ylim[1])
 plt.scatter([8,9,10,11],median_per_length.median(),marker = 's', s=120)
 
-
-#plot t4_td
-
-A = t4_td.groupby(by='length')
-for name, group in A:
+if plot_tandem:
+    CC_GG = sublib0_grouped.get_group('tandem CC/GG')
     length_l = []
-    median_l= []
-    dG_median = group['dG_Mut2_GUAA_1'].median()
-    if dG_median > dG_thr:
-        dG_median = dG_thr
-    dG_std = group['dG_Mut2_GUAA_1'].std()
-    print (dG_median)
-    print (dG_std)
-    print (name)  
-    length_to_plot = name + random.uniform(-0.07,0.07)
-    print(length_to_plot)
-    plt.scatter(length_to_plot,dG_median,c = 'magenta',s=180,marker='o',edgecolor = 'k')
-    length_l.append(length_to_plot)
-    median_l.append(dG_median)
-plt.plot(length_l,median_l,'grey',linewidth=0.5,linestyle='dashed')  
+    median_l = [] 
+    A = CC_GG.groupby(by = 'length')
+    for name, group in A:
+        dG = group['dG_Mut2_GUAA_1'].copy()
+        dG[dG>dG_threshold] = dG_threshold
+        dG_median = dG.median()
+#            if dG_median > dG_thr:
+#                dG_median = dG_thr
+        dG_std = dG.std()
+        length_to_plot = group['length'].median() + random.uniform(-0.07,0.07)
+        plt.scatter(length_to_plot,dG_median,c = colorsl[counter],s=120,marker='^',edgecolor = 'k')
+#            plt.errorbar(group['length'].median(),dG_median,yerr = dG_std,ecolor='k')
+        length_l.append(length_to_plot)
+        median_l.append(dG_median)
+    plt.plot(length_l,median_l,'black',linewidth=1.5,linestyle='dashed')
+    median_per_length.loc[receptors] = median_l
+#%%Compare double mutants to check if binding to base pairs
+canonical = all_11ntR[all_11ntR.r_seq == 'UAUGG_CCUAAG'].copy()
+canonical = canonical[canonical.b_name == 'normal']
+canonical = canonical.set_index('old_idx')
 
+double_mutants = all_11ntR[all_11ntR.no_mutations == 2].copy()
+double_mutants = double_mutants[double_mutants.b_name == 'normal']
+double_mutants_group = double_mutants.groupby(by ='r_seq')
 
+triple_mutants = all_11ntR[all_11ntR.no_mutations == 3].copy()
+triple_mutants = triple_mutants[triple_mutants.b_name == 'normal']
+triple_mutants_group = triple_mutants.groupby(by ='r_seq')
 
-#plot tandem_CC_GG
+variant = 'UAGGG_CCCAAG'
+variant_data = double_mutants_group.get_group(variant)
+variant_data = variant_data.set_index('old_idx')
+GAAA_data = variant_data['dG_Mut2_GAAA']
+GUAA_data = variant_data['dG_Mut2_GUAA_1']
+print(GAAA_data)
+print(GUAA_data)
 
-A = tandem_CC_GG.groupby(by='length')
-for name, group in A:
-    length_l = []
-    median_l= []
-    dG_median = group['dG_Mut2_GUAA_1'].median()
-    if dG_median > dG_thr:
-        dG_median = dG_thr
-    dG_std = group['dG_Mut2_GUAA_1'].std()
-    print (dG_median)
-    print (dG_std)
-    print (name)  
-    length_to_plot = name + random.uniform(-0.07,0.07)
-    print(length_to_plot)
-    plt.scatter(length_to_plot,dG_median,c = 'yellow',s=180,marker='o',edgecolor = 'k')
-    length_l.append(length_to_plot)
-    median_l.append(dG_median)
-plt.plot(length_l,median_l,'grey',linewidth=0.5,linestyle='dashed')
+ddG_GAAA = -1 * canonical['dG_Mut2_GAAA'].subtract(GAAA_data).median()
+print(ddG_GAAA)
+ddG_GUAA = -1 * canonical['dG_Mut2_GUAA_1'].subtract(GUAA_data).median()
+print(ddG_GUAA)
 
-
-
-#plot tandem_GG_CC
-
-A = tandem_GG_CC.groupby(by='length')
-for name, group in A:
-    length_l = []
-    median_l= []
-    dG_median = group['dG_Mut2_GUAA_1'].median()
-    if dG_median > dG_thr:
-        dG_median = dG_thr
-    dG_std = group['dG_Mut2_GUAA_1'].std()
-    print (dG_median)
-    print (dG_std)
-    print (name)  
-    length_to_plot = name + random.uniform(-0.07,0.07)
-    print(length_to_plot)
-    plt.scatter(length_to_plot,dG_median,c = 'blue',s=180,marker='o',edgecolor = 'k')
-    length_l.append(length_to_plot)
-    median_l.append(dG_median)
-plt.plot(length_l,median_l,'grey',linewidth=0.5,linestyle='dashed')  
 #%%
-b = tandem_GG_CC[tandem_GG_CC.length == 11]['dG_Mut2_GUAA_1']
-print(b)
-print(b.median())
+variant = 'UUAGG_CCUAAG'
+variant_data = all_data[all_data.r_seq == variant]
+variant_data = variant_data.set_index('old_idx')
+
+canonical = 'UAUGG_CCUAAG'
+canonical_data = all_data[(all_data.r_seq == canonical) & (all_data.b_name == 'normal')]
+canonical_data = canonical_data.set_index('old_idx')
+
+GAAA_data = variant_data['dG_Mut2_GAAA'].copy()
+GAAA_data[GAAA_data > dG_threshold] = dG_threshold
+
+GUAA_data = variant_data['dG_Mut2_GUAA_1'].copy()
+GUAA_data[GUAA_data > dG_threshold] = dG_threshold
+
+ddG_GAAA = GAAA_data.subtract(canonical_data['dG_Mut2_GAAA'])
+ddG_GAAA_median = ddG_GAAA.median()
+ddG_GAAA_std = ddG_GAAA.std()
+
+ddG_GUAA = GUAA_data.subtract(canonical_data['dG_Mut2_GUAA_1'])
+ddG_GUAA_median = ddG_GUAA.median()
+ddG_GUAA_std = ddG_GUAA.std()
+
+plt.bar([1,2],[ddG_GAAA_median,ddG_GUAA_median],yerr=[ddG_GAAA_std,ddG_GUAA_std])
+plt.ylim([-1,6])
+plt.xlim(0,3)
+
+#%%
+A = variant_data.groupby('length')
+for name, group in A:
+    print(name)
+    print(len(group))
+    print(group['dG_Mut2_GAAA'])
+    print(group['dG_Mut2_GAAA'].median())
+    
+for name, group in A:
+    print(name)
+    print(len(group))
+    print(group['dG_Mut2_GUAA_1'])
+    print(group['dG_Mut2_GUAA_1'].median())    
+#%% Analyze GAAA vs GUAA
+#Barplots    
+columns_to_plot = data_sM_11ntR.columns[150:200]
+counter = -1
+ddG_median_list = []
+ddG_std_list = []
+n_compared_list = []
+n_list= []
+
+for receptor in data_sM_11ntR.index[:-1]:
+    counter += 1
+    y_data = data_sM_11ntR.loc[receptor][columns_to_plot]
+    x_data = data_sM_11ntR.loc['UAUGG_CCUAAG'][columns_to_plot]
+    plt.scatter(x_data,y_data,c=colorsl[counter])
+    #calculate_median and number of datapoints
+    ddG = y_data.subtract(x_data)
+    ddG_median = ddG.median()
+    ddG_std = ddG.std()
+    ddG_median_list.append(ddG_median)
+    ddG_std_list.append(ddG_std)
+    mask = ~((x_data.isna())|(y_data.isna()))
+    n = sum(mask)
+    n_list.append(n)
+    
+    x_data[x_data > dG_threshold] = np.nan
+    y_data[y_data > dG_threshold] = np.nan
+    mask = ~((x_data.isna())|(y_data.isna()))
+    n_compared = sum(mask)
+    n_compared_list.append(n_compared)
+ddG_median_list.append(0)
+ddG_std_list.append(0)
+n_compared_list.append(np.nan)
+n_list.append(np.nan)
+
+d = {'ddG_median':ddG_median_list,'ddG_std':ddG_std_list,'n_above_thr':n_compared_list,'n':n_list}
+ddG_median_df = pd.DataFrame(index=data_sM_11ntR.index,data = d)
+plt.bar(range(0,34),ddG_median_df.ddG_median,yerr=ddG_median_df.ddG_std)
+plt.ylim([-1,2])
+plt.xlim(-1,34)
+#%% COMPARE SMs to WT with GUAA----- BARPLOT
+#THIS IS CORRECT as of 09/12/2018
+columns_to_plot = data_sM_11ntR.columns[150:155]
+counter = -1
+ddG_median_list = []
+ddG_std_list = []
+n_compared_list = []
+n_list= []
+n_above_limit_list = []
+
+#if greater than limit then replace with limit for each individual!!!!
+
+for receptor in data_sM_11ntR.index[:-1]:
+    counter += 1
+    
+    #Take receptor data; replace values above threshold by threshold
+    y_data = data_sM_11ntR.loc[receptor][columns_to_plot].dropna()
+    y_data[y_data > dG_threshold] = dG_threshold
+    
+    #Take WT data and replace values above threshold by threshold
+    x_data = data_sM_11ntR.loc['UAUGG_CCUAAG'][columns_to_plot]
+    x_data[x_data > dG_threshold] = dG_threshold
+    x_data = x_data.dropna()
+    
+    #These are the scaffolds that have data in both receptor and WT
+    scaffolds_to_compare = list(set(y_data.index) & set(x_data.index))
+    y_data = y_data.reindex(scaffolds_to_compare)
+    x_data = x_data.reindex(scaffolds_to_compare) 
+    
+    #This is so that we can count the number of values that were above the ddG limit
+    limits = dG_threshold - x_data 
+    
+    #calculate_median and number of datapoints
+    ddG = y_data.subtract(x_data)
+    print(len(x_data))
+    
+    
+    ddG_above_limit = ~(ddG >= limits)
+ #   ddG[~ddG_above_limit] = limits
+    
+    
+    n_above_limit = sum(ddG_above_limit)
+    n_above_limit_list.append(n_above_limit)
+    ddG_median = ddG.median()
+    ddG_std = ddG.std()
+    ddG_median_list.append(ddG_median)
+    ddG_std_list.append(ddG_std)
+    mask = ~((x_data.isna())|(y_data.isna()))
+    n = sum(mask)
+    n_list.append(n)
+    
+    x_data[x_data > dG_threshold] = np.nan
+    y_data[y_data > dG_threshold] = np.nan
+    mask = ~((x_data.isna())|(y_data.isna()))
+    n_compared = sum(mask)
+    n_compared_list.append(n_compared)
+ddG_median_list.append(0)
+ddG_std_list.append(0)
+n_compared_list.append(np.nan)
+n_list.append(np.nan)
+n_above_limit_list.append(np.nan)
+
+d = {'ddG_median':ddG_median_list,'ddG_std':ddG_std_list,'n_above_thr':n_compared_list,'n':n_list, 'n_above_limit_list':n_above_limit_list}
+ddG_median_df = pd.DataFrame(index=data_sM_11ntR.index,data = d)
+plt.bar(range(0,34),ddG_median_df.ddG_median,yerr=ddG_median_df.ddG_std)
+plt.ylim([-1,2])
+plt.xlim(-1,34)
 #%%
 #comparing 5mM with and without potassium
 apply_thr = True
-
 n_list = []
 diff_list = []
 std_list = []

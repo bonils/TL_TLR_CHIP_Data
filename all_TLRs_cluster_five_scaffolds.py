@@ -20,6 +20,7 @@ from scipy.spatial.distance import pdist
 from scipy.cluster.hierarchy import fcluster
 from sklearn.neighbors import NearestNeighbors
 from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
 #%%
 '''--------------Import Functions--------------''' 
 from clustering_functions import get_dG_for_scaffold
@@ -38,8 +39,36 @@ num_neighbors = 10 # for interpolation
 #Data has been separated into 11ntR, IC3, and in vitro
 data_path = '/Users/Steve/Desktop/Data_analysis_code/Data/'
 entire_lib = pd.read_csv(data_path + 'tectorna_results_tertcontacts.180122.csv')
+sublib5 = entire_lib[entire_lib['sublibrary'] == 'tertcontacts_5'].copy()
+list_intermediates = set(sublib5.r_name)
+print(len(list_intermediates))
+
+duplicated_seq = entire_lib.duplicated(subset = 'seq') 
+duplicated_data = entire_lib[duplicated_seq].copy()
+duplicated_data['new_name'] = duplicated_data['r_name'] + '_' + duplicated_data['r_seq'] + '_' + duplicated_data['sublibrary']
+unique_duplicated = set(list(duplicated_data['new_name']))
+print(len(unique_duplicated))
+
+# find which recpetors are duplicating with Vc2 to 11ntR intermediates
+all_receptor_seq = set(entire_lib['r_seq'])
+Vc2_inter = []
+for i in list_intermediates:
+    if ('11nt' in i) and ('Vc2' in i):
+        Vc2_inter.append(i)
+        
+sublib5 = sublib5.set_index('r_name') 
+ 
+Vc2_inter_data = sublib5.loc[Vc2_inter]
+Vc2_inter_seq = set(Vc2_inter_data.r_seq)
+
+dupl_Vc2_rec = []
+for Vc2_rec in Vc2_inter_seq:
+    for receptor in all_receptor_seq:
+        if Vc2_rec == receptor:
+            dupl_Vc2_rec.append(receptor)
+            break
 #%%Drop repeats, just because they are there; is the same data
-entire_lib = entire_lib.drop_duplicates(subset ='seq')
+entire_lib = entire_lib.drop_duplicates(subset ='seq',keep = 'last')
 #%%Consider the ones only with normal closing base pair 
 mask = entire_lib.b_name == 'normal' 
 entire_lib_normal_bp = entire_lib[mask]
@@ -51,11 +80,11 @@ entire_lib_selected = entire_lib_normal_bp[mask].copy()
 #%%Create new name identifier because there are some that were given the same name
 #but they are different receptors
 #also attacht the sublibrary they came from for later reference
-entire_lib_selected['new_name'] = entire_lib_selected.r_name + '_' + entire_lib_selected.r_seq + '_' + entire_lib_selected.sublibrary
+entire_lib_selected['new_name'] = entire_lib_selected.r_name + '_' + entire_lib_selected.r_seq #+ '_' + entire_lib_selected.sublibrary
+#entire_lib_selected = entire_lib_selected.set_index('new_name')
 #%%
 mask = entire_lib_selected['r_seq'] == 'UAUGG_CCUAAG'
 canonical = entire_lib_selected[mask]
-
 #%%
 #------------------------------------------
 apply_error_threshold = False
@@ -84,14 +113,16 @@ if apply_error_threshold:
     entire_lib_selected['dGerr_Mut2_GUAA_1'][mask] = np.nan
     print(sum(mask))
 #%%
-unique_receptors = sorted(list(set(list(entire_lib_selected.new_name))))
+#unique_receptors = sorted(list(set(list(entire_lib_selected.new_name))))
+
+unique_receptors = sorted(list(set(list(entire_lib_selected.r_seq))))
 #%% Start analyzing only five scaffolds, create dataframe with all data (5scaffolds * conditions)
 # for eact TLR ina a single row.
 scaffolds_five = ['13854','14007','14073','35311_A','35600']
 data = entire_lib_selected
 conditions = ['dG_Mut2_GAAA']#, 'dG_Mut2_GUAA_1']
 column_labels = ['dG_30mM_Mg_GAAA']#,'dG_30mM_Mg_GUAA']
-row_index= ('new_name')
+row_index= ('r_seq')
 flanking = 'normal'
 
 data_50_scaffolds_GAAA = pd.DataFrame(index = unique_receptors)
@@ -107,7 +138,7 @@ for scaffolds in scaffolds_five:
 
 conditions = ['dG_Mut2_GUAA_1']
 column_labels = ['dG_30mM_Mg_GUAA']
-row_index= ('new_name')
+row_index= ('r_seq')
 flanking = 'normal'
 
 data_50_scaffolds_GUAA = pd.DataFrame(index = unique_receptors)
@@ -124,7 +155,7 @@ for scaffolds in scaffolds_five:
 
 conditions = ['dG_Mut2_GAAA_5mM_2']
 column_labels = ['dG_5mM_Mg_GAAA']
-row_index= ('new_name')
+row_index= ('r_seq')
 flanking = 'normal'
 
 data_50_scaffolds_5Mg = pd.DataFrame(index = unique_receptors)
@@ -141,7 +172,7 @@ for scaffolds in scaffolds_five:
 
 conditions = ['dG_Mut2_GAAA_5mM_150mMK_1']
 column_labels = ['dG_5Mg150K_GAAA']
-row_index= ('new_name')
+row_index= ('r_seq')
 flanking = 'normal'
 
 data_50_scaffolds_5Mg150K = pd.DataFrame(index = unique_receptors)
@@ -164,12 +195,27 @@ prep_data,original_nan = prep_data_for_clustering_ver3(data_50_scaffolds,
                                                        dG_threshold,dG_replace,nan_threshold,
                                                        num_neighbors=num_neighbors)
 #%% CATALOGUING RECEPTORS: Create a receptor types dataframe with the type.
-all_receptors = list(prep_data.index)
-receptor_types_df = pd.DataFrame(index = prep_data.index)
+A = entire_lib_selected.drop_duplicates(subset = 'r_seq',keep = 'last').copy()
+A = A.set_index('r_seq')
+#%%
+new_index = []
+for sequence in prep_data.index:
+    for receptor in reversed(A.index):
+        if sequence == receptor:
+            new_index.append(A.loc[receptor]['new_name'])
+old_index = prep_data.index            
+prep_data.index = new_index
+prep_data['old_index'] = old_index   
+#%%
+sublib5['new_name'] = sublib5.index + '_' +  sublib5['r_seq']
+#%%
+all_receptors = new_index
+receptor_types_df = pd.DataFrame(index = new_index)
 receptor_types_df['type'] = 'uncatalogued'
-
+receptor_types_df['r_seq'] = old_index
+#%%
 for next_receptor in receptor_types_df.index:
-    if 'tertcontacts_5' in next_receptor:
+    if next_receptor in list(sublib5['new_name']):
         receptor_types_df.loc[next_receptor]['type'] = 'other'
     else:
         if '11ntR' in next_receptor:
@@ -183,6 +229,15 @@ for next_receptor in receptor_types_df.index:
     
         if ('C7.' in next_receptor) | ('B7.' in next_receptor)| ('GAAC_receptor' in next_receptor) :
             receptor_types_df.loc[next_receptor]['type'] = 'in_vitro' 
+
+#make sure that the WT sequences are in the correct category
+receptor_types_df['type'][receptor_types_df['r_seq'] == 'UAUGG_CCUAAG'] = '11ntR'            
+receptor_types_df['type'][receptor_types_df['r_seq'] == 'GAGGG_CCCUAAC'] = 'IC3'
+receptor_types_df['type'][receptor_types_df['r_seq'] == 'GUAGG_CCUAAAC'] = 'VC2'
+receptor_types_df['type'][receptor_types_df['r_seq'] == 'GAUGG_CCUGUAC'] = 'in_vitro'
+receptor_types_df['type'][receptor_types_df['r_seq'] == 'UAUGG_CCUGUG'] = 'in_vitro'
+receptor_types_df['type'][receptor_types_df['r_seq'] == 'GAAGGG_CCCCACGC'] = 'in_vitro'
+                       
 receptor_counts = receptor_types_df['type'].value_counts()
 print(receptor_counts)
 receptor_counts = receptor_counts.drop(['uncatalogued'])
@@ -197,6 +252,9 @@ uncatalogued_receptors.to_csv('uncatalogued_receptors.csv')
 # from the sequence database of group I introns
 uncatalogued_receptors = receptor_types_df[receptor_types_df.type == 'uncatalogued']
 prep_data = prep_data.drop(uncatalogued_receptors.index)
+
+#%%Return prep data to oringinal index
+prep_data = prep_data.set_index('old_index')
 #%%
 tandem_receptor = []
 for receptor in uncatalogued_receptors.index:
@@ -206,13 +264,18 @@ for receptor in uncatalogued_receptors.index:
 control_CC_GG = entire_lib_selected[entire_lib_selected.r_seq == 'GG_CC']    
 #Calculate the medians with respect to CHIP SCAFFOLD length
 A = control_CC_GG.groupby(by = 'length')
-
 #%%
+grouped_lib = entire_lib_selected.groupby('r_seq')
+IC3 = entire_lib_selected[entire_lib_selected.r_seq == 'GAGGG_CCCUAAC' ]
+VC2 = entire_lib_selected[entire_lib_selected.r_seq ==  'GUAGG_CCUAAAC']
+IC3_alt = entire_lib_selected[entire_lib_selected.r_seq == 'GAGGA_UUCUAAC' ]
+
 scaff = list(set(entire_lib_selected.old_idx))
-IC3 = entire_lib_selected[entire_lib_selected.new_name == 'IC3 _GAGGG_CCCUAAC_tertcontacts_0']
+#IC3 = entire_lib_selected[entire_lib_selected.new_name == 'IC3 _GAGGG_CCCUAAC_tertcontacts_0']
 IC3 = IC3.set_index('old_idx')
 IC3 = IC3.reindex(scaff)
-VC2 = entire_lib_selected[entire_lib_selected.new_name == 'VC2_GUAGG_CCUAAAC_tertcontacts_0']
+
+#VC2 = entire_lib_selected[entire_lib_selected.new_name == 'VC2_GUAGG_CCUAAAC_tertcontacts_0']
 VC2 = VC2.set_index('old_idx')
 VC2 = VC2.reindex(scaff)
 plt.scatter(IC3.dG_Mut2_GUAA_1,VC2.dG_Mut2_GUAA_1)
@@ -222,7 +285,7 @@ plt.ylim(-14,-6)
 plt.title('GUAA binding IC3 vs VC2')
 
 
-IC3_alt = entire_lib_selected[entire_lib_selected.new_name == 'IC3_1U_2U_12A_GAGGA_UUCUAAC_tertcontacts_0']
+#IC3_alt = entire_lib_selected[entire_lib_selected.new_name == 'IC3_1U_2U_12A_GAGGA_UUCUAAC_tertcontacts_0']
 IC3_alt = IC3_alt.set_index('old_idx')
 IC3_alt = IC3_alt.reindex(scaff)
 
@@ -276,15 +339,17 @@ receptor_info = receptor_info.set_index('new_name')
 receptor_info = receptor_info.reindex(receptor_types_df.index)
 #%% Create a single dataframe with all the information
 receptor_info['type'] = receptor_types_df['type']
+receptor_info['new_name'] = receptor_info.index
+receptor_info = receptor_info.set_index('r_seq')
 #%%Create a matrix with receptor types for later plotting aside with the clustermap
 #to show where the different receptors of different types are clusteringg
 columns = ['type_11ntR','type_IC3','type_VC2','type_inVitro','type_other',]
 receptors_types_matrix = pd.DataFrame(0,index=prep_data.index,columns=columns)
-receptors_types_matrix.type_11ntR[receptor_types_df.type == '11ntR'] = 1
-receptors_types_matrix.type_IC3[receptor_types_df.type == 'IC3'] = 1
-receptors_types_matrix.type_VC2[receptor_types_df.type == 'VC2'] = 1
-receptors_types_matrix.type_inVitro[receptor_types_df.type == 'in_vitro'] = 1
-receptors_types_matrix.type_other[receptor_types_df.type == 'other'] = 1
+receptors_types_matrix.type_11ntR[receptor_info.type == '11ntR'] = 1
+receptors_types_matrix.type_IC3[receptor_info.type == 'IC3'] = 1
+receptors_types_matrix.type_VC2[receptor_info.type == 'VC2'] = 1
+receptors_types_matrix.type_inVitro[receptor_info.type == 'in_vitro'] = 1
+receptors_types_matrix.type_other[receptor_info.type == 'other'] = 1
 #%%INITITAL CLUSTERIN OF THE DATA; THIS IS WITHOUT DOING PCA ANALYSIS OR MUCH
 #PREPROCESSING
 #Clustermap without PCA 
@@ -293,37 +358,126 @@ cg_without_PCA = sns.clustermap(prep_data_norm_with_nan,row_linkage=z_withoutPCA
                         vmin=-5,vmax=5,cmap='coolwarm')
 cg_without_PCA = sns.clustermap(receptors_types_matrix,row_linkage=z_withoutPCA, col_cluster=False,
                         vmin=0,vmax=1,cmap='Greys')
+
+#%%SCALING DATA DID NOT MAKE NOTICEABLE DIFFERENCE
+#scaler = StandardScaler()
+#df_test = scaler.fit_transform(prep_data_norm)
+#new = pd.DataFrame(df_test,index = prep_data_norm.index)
+#pca,transformed,loadings = doPCA(new)
+#num_PCA = 9
+#pd.Series(pca.explained_variance_ratio_).plot(kind='bar')
+#plt.ylabel('fraction of variance \nexplained by each PC', fontsize=14)
+#plt.tight_layout()
+#print('Fraction explained by the first ',str(num_PCA), 'PCAs :',sum(pca.explained_variance_ratio_[:num_PCA]))
+##
+#plt.figure()
+#cumulative = 1 - np.cumsum(pca.explained_variance_ratio_)
+#plt.plot(range(len(cumulative)),cumulative)
+#list_PCAs = list(transformed.columns[:num_PCA])
+#z_pca = sch.linkage(transformed.loc[:,list_PCAs],method='ward',optimal_ordering=True) 
+#cg_pca = sns.clustermap(prep_data_norm_with_nan,row_linkage=z_pca, col_cluster=False
+#                        ,row_cluster=True, vmin=-3.2,vmax=3.2,cmap='coolwarm')
+##
+#X = transformed.loc[:,list_PCAs]
+#c, coph_dists = cophenet(z_pca, pdist(X))
+#print('cophenetic distance: ',c)
+##
+#reordered_data = pd.DataFrame(index = range(0,len(prep_data_norm)))
+#reordered_data['name'] = list(prep_data_norm.index)
+#reordered_data = reordered_data.reindex(list(cg_pca.dendrogram_row.reordered_ind))
+#reordered_data.index = range(0,len(prep_data_norm))
+##
+#a= list(cg_pca.dendrogram_row.reordered_ind)
+##Display Dendrogram a locate specific tetraloop-receptors
+#distance_threshold = 12
+#dendro = sch.dendrogram(z_pca,color_threshold=distance_threshold)
+#plt.show()
+#max_d = distance_threshold
+#clusters = fcluster(z_pca, max_d, criterion='distance')
+#number_clusters = max(clusters)
+#print('number of clusters: ' + str(number_clusters))
+##
+##
+#clusters_df = pd.DataFrame(clusters,index = prep_data_norm_with_nan.index,columns = ['cluster_No'])
+#print('number of clusters based on distance of ',str(max_d), ':', str(number_clusters))
+#WT_cluster = clusters_df.loc['11ntR_UAUGG_CCUAAG_tertcontacts_0'].cluster_No
+#print('11ntR clustered with group ' + str(WT_cluster))
+#C_WT = clusters_df[clusters_df.cluster_No == WT_cluster]
+#print('in location: ' + str(reordered_data[reordered_data.name == '11ntR_UAUGG_CCUAAG_tertcontacts_0'].index))
+#print('which has shape ' + str(C_WT.shape))
+#
+#IC3_cluster = clusters_df.loc['IC3 _GAGGG_CCCUAAC_tertcontacts_0'].cluster_No
+#print('IC3 clustered with group ' + str(IC3_cluster))
+#C_IC3 = clusters_df[clusters_df.cluster_No == IC3_cluster]
+#print('in location: ' + str(reordered_data[reordered_data.name == 'IC3 _GAGGG_CCCUAAC_tertcontacts_0'].index))
+#print('which has shape ' + str(C_IC3.shape))
+#
+#C72_cluster = clusters_df.loc['C7.2_GAUGG_CCUGUAC_tertcontacts_0'].cluster_No
+#print('C7.2 clustered with group ' + str(C72_cluster))
+#C_C72 = clusters_df[clusters_df.cluster_No == C72_cluster]
+#print('in location: ' + str(reordered_data[reordered_data.name == 'C7.2_GAUGG_CCUGUAC_tertcontacts_0'].index))
+#print('which has shape ' + str(C_C72.shape))
+#
+#C72_cluster = clusters_df.loc['IC3 _GAGGG_CCUUAUC_tertcontacts_4'].cluster_No
+#print('max specificity for GUAAA clustered with group ' + str(C72_cluster))
+#C_C72 = clusters_df[clusters_df.cluster_No == C72_cluster]
+#print('which has shape ' + str(C_C72.shape))
+#
+#Vc2_cluster = clusters_df.loc['VC2_GUAGG_CCUAAAC_tertcontacts_0'].cluster_No
+#print('Vc2 which showed weak specificity clustered with group ' + str(Vc2_cluster))
+#C_Vc2 = clusters_df[clusters_df.cluster_No == Vc2_cluster]
+#print('in location: ' + str(reordered_data[reordered_data.name == 'VC2_GUAGG_CCUAAAC_tertcontacts_0'].index))
+#print('which has shape ' + str(C_Vc2.shape))
+
 #%%CLUSTER THE DATA AGAIN BUT NOW WITH PCA ANALYSIS PRECEEDING THE CLUSTERING;
 #FOR THE PCA, I AM USING THE FUNCTION THAT SARAH GAVE ME
 '''------------PCA Analysis of raw data-----------------'''
 
 #How many PCs shall we use????
 num_PCA = 9
-
 pca,transformed,loadings = doPCA(prep_data_norm)
 #plot explained variance by PC
 pd.Series(pca.explained_variance_ratio_).plot(kind='bar')
 plt.ylabel('fraction of variance \nexplained by each PC', fontsize=14)
 plt.tight_layout()
 print('Fraction explained by the first ',str(num_PCA), 'PCAs :',sum(pca.explained_variance_ratio_[:num_PCA]))
+
+plt.figure()
+cumulative = 1 - np.cumsum(pca.explained_variance_ratio_)
+plt.plot(range(len(cumulative)),cumulative)
+
 list_PCAs = list(transformed.columns[:num_PCA])
 #%%
 z_pca = sch.linkage(transformed.loc[:,list_PCAs],method='ward',optimal_ordering=True) 
 cg_pca = sns.clustermap(prep_data_norm_with_nan,row_linkage=z_pca, col_cluster=False
-                        , vmin=-3.2,vmax=3.2,cmap='coolwarm')
-#cg_pca.savefig('/Volumes/NO NAME/Clustermaps/clustermap_alldata_ddG.svg')
+                        ,row_cluster=True, vmin=-3.2,vmax=3.2,cmap='coolwarm')
+cg_pca.savefig('/Volumes/NO NAME/Clustermaps/clustermap_alldata_ddG.svg')
+
 
 cg_receptors= sns.clustermap(receptors_types_matrix,row_linkage=z_pca, col_cluster=False,
                         vmin=0,vmax=1,cmap='Greys')
-#cg_receptors.savefig('/Volumes/NO NAME/Clustermaps/clustermap_receptors.svg')
+cg_receptors.savefig('/Volumes/NO NAME/Clustermaps/clustermap_receptors.svg')
 
 cg_mean_dG= sns.clustermap(mean_per_row,row_linkage=z_pca, col_cluster=False,
                         vmin=-10,vmax=-7,cmap='Blues_r')
-#cg_mean_dG.savefig('/Volumes/NO NAME/Clustermaps/clustermap_mean_dG.svg')
+cg_mean_dG.savefig('/Volumes/NO NAME/Clustermaps/clustermap_mean_dG.svg')
 X = transformed.loc[:,list_PCAs]
 c, coph_dists = cophenet(z_pca, pdist(X))
 print('cophenetic distance: ',c)
+#%%
+columns = ['type_11ntR','type_IC3','type_VC2','type_inVitro']
+wt_types_matrix = pd.DataFrame(0,index=prep_data.index,columns=columns)
+wt_types_matrix.type_11ntR[receptor_info.index == 'UAUGG_CCUAAG'] = 1
+wt_types_matrix.type_IC3[receptor_info.index == 'GAGGG_CCCUAAC'] = 1
+wt_types_matrix.type_VC2[receptor_info.index == 'GUAGG_CCUAAAC'] = 1
+wt_types_matrix.type_inVitro[receptor_info.index == 'GAUGG_CCUGUAC'] = 1
+wt_types_matrix.type_inVitro[receptor_info.index == 'UAUGG_CCUGUG'] = 1
+wt_types_matrix.type_inVitro[receptor_info.index == 'GAAGGG_CCCCACGC'] = 1
+#wt_types_matrix.type_other[receptor_info.type == 'other'] = 1
 
+cg_receptors= sns.clustermap(wt_types_matrix,row_linkage=z_pca, col_cluster=False,
+                        vmin=0,vmax=1,cmap='Blues')
+cg_receptors.savefig('/Volumes/NO NAME/Clustermaps/clustermap_receptors_WT.svg')
 #%%
 reordered_data = pd.DataFrame(index = range(0,len(prep_data_norm)))
 reordered_data['name'] = list(prep_data_norm.index)
@@ -342,34 +496,59 @@ print('number of clusters: ' + str(number_clusters))
 #%%
 clusters_df = pd.DataFrame(clusters,index = prep_data_norm_with_nan.index,columns = ['cluster_No'])
 print('number of clusters based on distance of ',str(max_d), ':', str(number_clusters))
-WT_cluster = clusters_df.loc['11ntR_UAUGG_CCUAAG_tertcontacts_0'].cluster_No
+WT_cluster = clusters_df.loc['UAUGG_CCUAAG'].cluster_No
 print('11ntR clustered with group ' + str(WT_cluster))
 C_WT = clusters_df[clusters_df.cluster_No == WT_cluster]
-print('in location: ' + str(reordered_data[reordered_data.name == '11ntR_UAUGG_CCUAAG_tertcontacts_0'].index))
+print('in location: ' + str(reordered_data[reordered_data.name == 'UAUGG_CCUAAG'].index))
 print('which has shape ' + str(C_WT.shape))
 
-IC3_cluster = clusters_df.loc['IC3 _GAGGG_CCCUAAC_tertcontacts_0'].cluster_No
+IC3_cluster = clusters_df.loc['GAGGG_CCCUAAC'].cluster_No
 print('IC3 clustered with group ' + str(IC3_cluster))
 C_IC3 = clusters_df[clusters_df.cluster_No == IC3_cluster]
-print('in location: ' + str(reordered_data[reordered_data.name == 'IC3 _GAGGG_CCCUAAC_tertcontacts_0'].index))
+print('in location: ' + str(reordered_data[reordered_data.name == 'GAGGG_CCCUAAC'].index))
 print('which has shape ' + str(C_IC3.shape))
 
-C72_cluster = clusters_df.loc['C7.2_GAUGG_CCUGUAC_tertcontacts_0'].cluster_No
+C72_cluster = clusters_df.loc['GAUGG_CCUGUAC'].cluster_No
 print('C7.2 clustered with group ' + str(C72_cluster))
 C_C72 = clusters_df[clusters_df.cluster_No == C72_cluster]
-print('in location: ' + str(reordered_data[reordered_data.name == 'C7.2_GAUGG_CCUGUAC_tertcontacts_0'].index))
+print('in location: ' + str(reordered_data[reordered_data.name == 'GAUGG_CCUGUAC'].index))
 print('which has shape ' + str(C_C72.shape))
 
-C72_cluster = clusters_df.loc['IC3 _GAGGG_CCUUAUC_tertcontacts_4'].cluster_No
+C72_cluster = clusters_df.loc['GAGGG_CCUUAUC'].cluster_No
 print('max specificity for GUAAA clustered with group ' + str(C72_cluster))
 C_C72 = clusters_df[clusters_df.cluster_No == C72_cluster]
 print('which has shape ' + str(C_C72.shape))
 
-Vc2_cluster = clusters_df.loc['VC2_GUAGG_CCUAAAC_tertcontacts_0'].cluster_No
+Vc2_cluster = clusters_df.loc['GUAGG_CCUAAAC'].cluster_No
 print('Vc2 which showed weak specificity clustered with group ' + str(Vc2_cluster))
 C_Vc2 = clusters_df[clusters_df.cluster_No == Vc2_cluster]
-print('in location: ' + str(reordered_data[reordered_data.name == 'VC2_GUAGG_CCUAAAC_tertcontacts_0'].index))
+print('in location: ' + str(reordered_data[reordered_data.name == 'GUAGG_CCUAAAC'].index))
 print('which has shape ' + str(C_Vc2.shape))
+
+C79_cluster = clusters_df.loc['UAUGG_CCUGAAG'].cluster_No
+print('C79  clustered with group ' + str(C79_cluster))
+C_C79 = clusters_df[clusters_df.cluster_No == C79_cluster]
+print('in location: ' + str(reordered_data[reordered_data.name == 'UAUGG_CCUGAAG'].index))
+print('which has shape ' + str(C_C79.shape))
+
+C734_cluster = clusters_df.loc['GAAGGG_CCCCACGC' ].cluster_No
+print('C7.34  clustered with group ' + str(C734_cluster))
+C_C734 = clusters_df[clusters_df.cluster_No == C734_cluster]
+print('in location: ' + str(reordered_data[reordered_data.name == 'GAAGGG_CCCCACGC' ].index))
+print('which has shape ' + str(C_C734.shape))
+
+C743_cluster = clusters_df.loc['AAUGG_CCUGCC'].cluster_No
+print('C7.43  clustered with group ' + str(C743_cluster))
+C_C743 = clusters_df[clusters_df.cluster_No == C743_cluster]
+print('in location: ' + str(reordered_data[reordered_data.name == 'AAUGG_CCUGCC' ].index))
+print('which has shape ' + str(C_C743.shape))
+#%%
+
+#receptor = 'C7.9_UAUGG_CCUGAAG_tertcontacts_0' 
+#receptor = 'C7.43_AAUGG_CCUGCC_tertcontacts_0' 
+#receptor = 'C7.22_GAUGG_CCUGCAC_tertcontacts_0' 
+#receptor = 'C7.34_GAAGGG_CCCCACGC_tertcontacts_0' 
+receptor = 'C7.10_UAUGG_CCUGUG_tertcontacts_0' 
 #%% plot profiles with respect to 11ntR_WT
 #FOR 5 conditions
 low_lim = -14
@@ -451,8 +630,35 @@ plt.tick_params(axis='both', which='major', labelsize=24)
 plt.axes().set_aspect('equal')
 plt.xlabel('$\Delta$G$^{11ntR}_{bind}$ (kcal/mol)',fontsize=22)
 plt.ylabel('$\Delta$G$^{mut}_{bind}$ (kcal/mol)',fontsize=22)
+
+
+
+###########################
+WT_data = prep_data_with_nan.loc['11ntR_UAUGG_CCUAAG_tertcontacts_0']
+receptors = 'C7.9_UAUGG_CCUGAAG_tertcontacts_0'
+plt.figure()
+#plot 30mM 
+plt.scatter(WT_data[columns_to_plot[0:5]],prep_data_with_nan.loc[receptors][columns_to_plot[0:5]],s=120,edgecolors='k',c='orange')
+#plot 5 mM GAAA
+plt.scatter(WT_data[columns_to_plot[5:10]],prep_data_with_nan.loc[receptors][columns_to_plot[5:10]],s=120,edgecolors='k',c='orange',marker='s')
+#plot 5 mM + 150K
+plt.scatter(WT_data[columns_to_plot[10:15]],prep_data_with_nan.loc[receptors][columns_to_plot[10:15]],s=120,edgecolors='k',c='orange',marker ='*')
+#plot GUAA
+plt.scatter(WT_data[columns_to_plot[15:20]],prep_data_with_nan.loc[receptors][columns_to_plot[15:20]],s=120,edgecolors='k',c='orange',marker ='^')
+
+plt.plot(x,x,':k')
+plt.plot(x,y_thres,':k',linewidth = 0.5)
+plt.plot(y_thres,x,':k',linewidth = 0.5)
+plt.xlim(low_lim,high_lim)
+plt.ylim(low_lim,high_lim)
+plt.xticks(list(range(-14,-4,2)))
+plt.yticks(list(range(-14,-4,2)))
+plt.tick_params(axis='both', which='major', labelsize=24)
+plt.axes().set_aspect('equal')
+plt.xlabel('$\Delta$G$^{11ntR}_{bind}$ (kcal/mol)',fontsize=22)
+plt.ylabel('$\Delta$G$^{mut}_{bind}$ (kcal/mol)',fontsize=22)
 #%% plot profiles with respect to 11ntR_WT
-#FOR 5 conditions
+#FOR 50 conditions
 low_lim = -14
 high_lim = -6
 x = [low_lim, dG_threshold] #for plotting  y= x line
@@ -460,14 +666,20 @@ y_thres = [dG_threshold,dG_threshold]
 
 #receptor = 'VC2_GUAGG_CCUAAAC_tertcontacts_0'
 #receptor = 'C7.2_GAUGG_CCUGUAC_tertcontacts_0'
-receptor = 'IC3 _GAGGG_CCCUAAC_tertcontacts_0'
+#receptor = 'IC3 _GAGGG_CCCUAAC_tertcontacts_0'
 #receptor = '11ntR_9C_UACGG_CCUAAG_tertcontacts_0'
+#receptor = 'C7.9_UAUGG_CCUGAAG_tertcontacts_0' 
+#receptor = 'C7.43_AAUGG_CCUGCC_tertcontacts_0' 
+#receptor = 'C7.22_GAUGG_CCUGCAC_tertcontacts_0' 
+#receptor = 'GAAGGG_CCCCACGC'#C7.34 
+#receptor = 'UAUGG_CCUGUG' #C7.10
+receptor = 'GAGGG_CCUUAUC' #max specificity for GUAA
 
 color_to_plot = 'blue'
 
 
-library_to_plot = entire_lib_selected.copy().groupby('new_name')
-to_plot_x = library_to_plot.get_group('11ntR_UAUGG_CCUAAG_tertcontacts_0').set_index('old_idx')
+library_to_plot = entire_lib_selected.copy().groupby('r_seq')
+to_plot_x = library_to_plot.get_group('UAUGG_CCUAAG').set_index('old_idx')
 to_plot_x = to_plot_x.reindex(scaff)
 to_plot_y = library_to_plot.get_group(receptor).set_index('old_idx')
 to_plot_y = to_plot_y.reindex(scaff)
@@ -580,6 +792,89 @@ above_limit = limits_per_row > limits_thr_num
 cg_limits= sns.clustermap(above_limit,row_linkage=z_pca, col_cluster=False,
                         vmin=0,vmax=1,cmap='Greys')
 cg_limits.savefig('/Volumes/NO NAME/Clustermaps/limits.svg')
+
+#%%
+#separate data that is above limit
+prep_data_norm_nan_limit = prep_data_norm_with_nan[above_limit]
+prep_data_norm_limit = prep_data_norm[above_limit]
+
+prep_data_norm_nan_above_limit = prep_data_norm_with_nan[~above_limit]
+prep_data_norm_above_limit = prep_data_norm[~above_limit]
+
+num_PCA = 9
+pca,transformed,loadings = doPCA(prep_data_norm_above_limit)
+#plot explained variance by PC
+pd.Series(pca.explained_variance_ratio_).plot(kind='bar')
+plt.ylabel('fraction of variance \nexplained by each PC', fontsize=14)
+plt.tight_layout()
+print('Fraction explained by the first ',str(num_PCA), 'PCAs :',sum(pca.explained_variance_ratio_[:num_PCA]))
+list_PCAs = list(transformed.columns[:num_PCA])
+
+z_pca = sch.linkage(transformed.loc[:,list_PCAs],method='ward',optimal_ordering=False) 
+cg_pca = sns.clustermap(prep_data_norm_nan_above_limit,row_linkage=z_pca, col_cluster=False
+                        , vmin=-3.2,vmax=3.2,cmap='coolwarm')
+#cg_pca.savefig('/Volumes/NO NAME/Clustermaps/clustermap_alldata_ddG.svg')
+
+#Display Dendrogram a locate specific tetraloop-receptors
+plt.figure()
+distance_threshold = 12
+dendro = sch.dendrogram(z_pca,color_threshold=distance_threshold)
+plt.show()
+max_d = distance_threshold
+clusters = fcluster(z_pca, max_d, criterion='distance')
+number_clusters = max(clusters)
+print('number of clusters: ' + str(number_clusters))
+
+reordered_data = pd.DataFrame(index = range(0,len(prep_data_norm_nan_above_limit)))
+reordered_data['name'] = list(prep_data_norm_nan_above_limit.index)
+reordered_data = reordered_data.reindex(list(cg_pca.dendrogram_row.reordered_ind))
+reordered_data.index = range(0,len(prep_data_norm_nan_above_limit))
+
+clusters_df = pd.DataFrame(clusters,index = prep_data_norm_nan_above_limit.index,columns = ['cluster_No'])
+print('number of clusters based on distance of ',str(max_d), ':', str(number_clusters))
+
+
+WT_cluster = clusters_df.loc['11ntR_UAUGG_CCUAAG_tertcontacts_0'].cluster_No
+print('11ntR clustered with group ' + str(WT_cluster))
+C_WT = clusters_df[clusters_df.cluster_No == WT_cluster]
+print('in location: ' + str(reordered_data[reordered_data.name == '11ntR_UAUGG_CCUAAG_tertcontacts_0'].index))
+print('which has shape ' + str(C_WT.shape))
+
+
+IC3_cluster = clusters_df.loc['IC3 _GAGGG_CCCUAAC_tertcontacts_0'].cluster_No
+print('IC3 clustered with group ' + str(IC3_cluster))
+C_IC3 = clusters_df[clusters_df.cluster_No == IC3_cluster]
+print('in location: ' + str(reordered_data[reordered_data.name == 'IC3 _GAGGG_CCCUAAC_tertcontacts_0'].index))
+print('which has shape ' + str(C_IC3.shape))
+
+C72_cluster = clusters_df.loc['C7.2_GAUGG_CCUGUAC_tertcontacts_0'].cluster_No
+print('C7.2 clustered with group ' + str(C72_cluster))
+C_C72 = clusters_df[clusters_df.cluster_No == C72_cluster]
+print('in location: ' + str(reordered_data[reordered_data.name == 'C7.2_GAUGG_CCUGUAC_tertcontacts_0'].index))
+print('which has shape ' + str(C_C72.shape))
+
+C72_cluster = clusters_df.loc['IC3 _GAGGG_CCUUAUC_tertcontacts_4'].cluster_No
+print('max specificity for GUAAA clustered with group ' + str(C72_cluster))
+C_C72 = clusters_df[clusters_df.cluster_No == C72_cluster]
+print('which has shape ' + str(C_C72.shape))
+
+Vc2_cluster = clusters_df.loc['VC2_GUAGG_CCUAAAC_tertcontacts_0'].cluster_No
+print('Vc2 which showed weak specificity clustered with group ' + str(Vc2_cluster))
+C_Vc2 = clusters_df[clusters_df.cluster_No == Vc2_cluster]
+print('in location: ' + str(reordered_data[reordered_data.name == 'VC2_GUAGG_CCUAAAC_tertcontacts_0'].index))
+print('which has shape ' + str(C_Vc2.shape))
+#%%
+cg_receptors= sns.clustermap(receptors_types_matrix,row_linkage=z_pca, col_cluster=False,
+                        vmin=0,vmax=1,cmap='Greys')
+#cg_receptors.savefig('/Volumes/NO NAME/Clustermaps/clustermap_receptors.svg')
+
+cg_mean_dG= sns.clustermap(mean_per_row,row_linkage=z_pca, col_cluster=False,
+                        vmin=-10,vmax=-7,cmap='Blues_r')
+#cg_mean_dG.savefig('/Volumes/NO NAME/Clustermaps/clustermap_mean_dG.svg')
+X = transformed.loc[:,list_PCAs]
+c, coph_dists = cophenet(z_pca, pdist(X))
+print('cophenetic distance: ',c)
+
 #%% NOW WE ARE GOING TO WANT TO ALL DATA, HISTOGRAMS, SCATTER PLOTS ETC
 #BUT ONLY WANT TO INCLUDE DATA THAT HAS BEEN ANALYZED ABOVE 
 original_data = data_50_scaffolds.copy()

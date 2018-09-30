@@ -1,0 +1,138 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Sep 13 13:55:02 2018
+
+@author: Steve
+"""
+
+'''--------------Import Libraries--------------------'''
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+import math
+import random
+import scipy.stats
+from matplotlib.pyplot import *
+import scipy.cluster.hierarchy as sch
+import sklearn.decomposition as skd
+from scipy.cluster.hierarchy import cophenet
+from scipy.spatial.distance import pdist
+from scipy.cluster.hierarchy import fcluster
+from sklearn.neighbors import NearestNeighbors
+#%%
+dG_threshold = -7.1
+
+data_path = '/Users/Steve/Desktop/Data_analysis_code/Data/'
+all_11ntR = pd.read_csv(data_path + 'all_11ntRs_unique.csv' )
+mask = all_11ntR['dG_Mut2_GAAA']>dG_threshold
+all_11ntR['dG_Mut2_GAAA'][mask] = dG_threshold
+mask = all_11ntR['dG_Mut2_GAAA_5mM_150mMK_1']>dG_threshold
+all_11ntR['dG_Mut2_GAAA_5mM_150mMK_1'][mask] = dG_threshold
+#%%
+frequencies = pd.read_csv(data_path + 'found_11ntR_receptors.csv' )
+frequencies['sequence'] = frequencies['sequence'].map(lambda x: x.strip('\''))
+frequencies = frequencies.set_index('sequence') 
+# only use normal flanking base pair
+all_11ntR = all_11ntR[all_11ntR['b_name'] == 'normal']
+# group data by receptor
+receptor_data = all_11ntR.groupby('r_seq')
+WT_data = receptor_data.get_group('UAUGG_CCUAAG').copy()
+WT_data = WT_data.set_index('old_idx')
+all_scaffolds = list(WT_data.index)
+#%%
+# calculate ddGs relative to 11ntR WT
+ddG_30Mg_list = []
+std_30Mg = []
+
+
+ddG_5Mg_list = []
+ddG_5Mg150K_list = []
+ddG_GUAA_list = []
+for receptors in frequencies.index:
+    mutant_data = receptor_data.get_group(receptors).copy()
+    mutant_data = mutant_data.set_index('old_idx')
+    mutant_data = mutant_data.reindex(all_scaffolds)
+    
+    ddG_30Mg = mutant_data['dG_Mut2_GAAA'].subtract(WT_data['dG_Mut2_GAAA'])
+    ddG_30Mg_list.append(ddG_30Mg.median())
+    std_30Mg.append(ddG_30Mg.std())
+
+    
+    ddG_5Mg150K = mutant_data['dG_Mut2_GAAA_5mM_150mMK_1'].subtract(WT_data['dG_Mut2_GAAA_5mM_150mMK_1'])
+    ddG_5Mg150K_list.append(ddG_5Mg150K.median())
+    
+    ddG_5Mg = mutant_data['dG_Mut2_GAAA_5mM_2'].subtract(WT_data['dG_Mut2_GAAA_5mM_2'])
+    ddG_5Mg_list.append(ddG_5Mg.median())    
+    
+    
+#    
+frequencies['ddG_30Mg'] = ddG_30Mg_list
+frequencies['std_30Mg'] = std_30Mg
+frequencies['ddG_5Mg150K'] = ddG_5Mg150K_list
+frequencies['ddG_5Mg'] = ddG_5Mg_list
+
+#%%
+#frequencies['GNRA_confirmed'][frequencies['GNRA_confirmed'] == 0] = 0.001
+#%%
+F = frequencies[frequencies['GNRA_confirmed'] > 0].copy()
+F['log_freq'] = F['GNRA_confirmed'].apply(np.log10)
+
+F2 = frequencies[frequencies['GNRA_confirmed'] == 0]
+#%%
+#plt.scatter(F.log_freq,F.ddG_30Mg)
+#
+#plt.figure()
+#plt.scatter(frequencies.GNRA_confirmed,frequencies.relKd_30Mg)
+#
+#
+#plt.figure()
+#plt.scatter(frequencies.GNRA_confirmed,frequencies.ddG_30Mg)
+#%%
+print(F['log_freq'].corr(F['ddG_30Mg']))
+plt.figure()
+plt.scatter(F['log_freq'],F['ddG_30Mg'])
+print(F['log_freq'].corr(F['ddG_5Mg150K']))
+plt.figure()
+plt.scatter(F['log_freq'],F['ddG_5Mg150K'])
+
+print(F['log_freq'].corr(F['ddG_5Mg']))
+plt.figure()
+plt.scatter(F['log_freq'],F['ddG_5Mg'])
+#%%
+plt.figure()
+sns.regplot(F['log_freq'],F['ddG_30Mg'],color='black')
+plt.axes().set_aspect('equal')
+plt.ylim([-1,5])
+
+plt.figure()
+plt.scatter(F2['GNRA_confirmed'],F2['ddG_30Mg'],color='black')
+plt.axes().set_aspect('equal')
+plt.ylim([-1,5])
+plt.xlim([-1,1])
+
+plt.figure()
+sns.regplot(F['log_freq'],F['ddG_5Mg150K'],color='black')
+plt.axes().set_aspect('equal')
+plt.ylim([-1,5])
+
+plt.figure()
+plt.scatter(F2['GNRA_confirmed'],F2['ddG_5Mg150K'],color='black')
+plt.axes().set_aspect('equal')
+plt.ylim([-1,5])
+plt.xlim([-1,1])
+
+mask = F['ddG_5Mg'] < 4.9
+plt.figure()
+sns.regplot(F['log_freq'][mask],F['ddG_5Mg'][mask],color='black')
+plt.axes().set_aspect('equal')
+plt.ylim([-1,5])
+
+mask = F2['ddG_5Mg'] < 4.9
+plt.figure()
+plt.scatter(F2['GNRA_confirmed'][mask],F2['ddG_5Mg'][mask],color='black')
+plt.axes().set_aspect('equal')
+plt.ylim([-1,5])
+plt.xlim([-1,1])
