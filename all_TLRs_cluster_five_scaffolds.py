@@ -119,6 +119,13 @@ unique_receptors = sorted(list(set(list(entire_lib_selected.r_seq))))
 #%% Start analyzing only five scaffolds, create dataframe with all data (5scaffolds * conditions)
 # for eact TLR ina a single row.
 scaffolds_five = ['13854','14007','14073','35311_A','35600']
+aa = canonical.copy()
+aa = aa.set_index('old_idx')
+aa = aa['dG_Mut2_GAAA']
+aa = aa.loc[scaffolds_five]
+aa = aa.sort_values()
+scaffolds_five = list(aa.index)
+#%%
 data = entire_lib_selected
 conditions = ['dG_Mut2_GAAA']#, 'dG_Mut2_GUAA_1']
 column_labels = ['dG_30mM_Mg_GAAA']#,'dG_30mM_Mg_GUAA']
@@ -341,6 +348,8 @@ receptor_info = receptor_info.reindex(receptor_types_df.index)
 receptor_info['type'] = receptor_types_df['type']
 receptor_info['new_name'] = receptor_info.index
 receptor_info = receptor_info.set_index('r_seq')
+#%%
+receptor_info.to_pickle('./receptor_info.pkl')
 #%%Create a matrix with receptor types for later plotting aside with the clustermap
 #to show where the different receptors of different types are clusteringg
 columns = ['type_11ntR','type_IC3','type_VC2','type_inVitro','type_other',]
@@ -350,6 +359,8 @@ receptors_types_matrix.type_IC3[receptor_info.type == 'IC3'] = 1
 receptors_types_matrix.type_VC2[receptor_info.type == 'VC2'] = 1
 receptors_types_matrix.type_inVitro[receptor_info.type == 'in_vitro'] = 1
 receptors_types_matrix.type_other[receptor_info.type == 'other'] = 1
+
+receptors_types_matrix.to_pickle('./receptors_types_matrix.pkl')
 #%%INITITAL CLUSTERIN OF THE DATA; THIS IS WITHOUT DOING PCA ANALYSIS OR MUCH
 #PREPROCESSING
 #Clustermap without PCA 
@@ -451,16 +462,16 @@ list_PCAs = list(transformed.columns[:num_PCA])
 z_pca = sch.linkage(transformed.loc[:,list_PCAs],method='ward',optimal_ordering=True) 
 cg_pca = sns.clustermap(prep_data_norm_with_nan,row_linkage=z_pca, col_cluster=False
                         ,row_cluster=True, vmin=-3.2,vmax=3.2,cmap='coolwarm')
-cg_pca.savefig('/Volumes/NO NAME/Clustermaps/clustermap_alldata_ddG.svg')
+cg_pca.savefig('/Volumes/NO NAME/Clustermaps/five_scaff_02_10_2018.svg')
 
 
 cg_receptors= sns.clustermap(receptors_types_matrix,row_linkage=z_pca, col_cluster=False,
                         vmin=0,vmax=1,cmap='Greys')
-cg_receptors.savefig('/Volumes/NO NAME/Clustermaps/clustermap_receptors.svg')
+#cg_receptors.savefig('/Volumes/NO NAME/Clustermaps/clustermap_receptors.svg')
 
 cg_mean_dG= sns.clustermap(mean_per_row,row_linkage=z_pca, col_cluster=False,
                         vmin=-10,vmax=-7,cmap='Blues_r')
-cg_mean_dG.savefig('/Volumes/NO NAME/Clustermaps/clustermap_mean_dG.svg')
+#cg_mean_dG.savefig('/Volumes/NO NAME/Clustermaps/clustermap_mean_dG.svg')
 X = transformed.loc[:,list_PCAs]
 c, coph_dists = cophenet(z_pca, pdist(X))
 print('cophenetic distance: ',c)

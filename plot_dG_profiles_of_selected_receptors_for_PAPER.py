@@ -251,10 +251,21 @@ TLR_11ntR_GUAA = grouped_lib.get_group('UAUGG_CCUAAG')['dG_Mut2_GUAA_1']
 TLR_IC3_GUAA = grouped_lib.get_group(IC3)['dG_Mut2_GUAA_1']
 TLR_VC2_GUAA = grouped_lib.get_group(VC2)['dG_Mut2_GUAA_1']
 TLR_U9G_GUAA = grouped_lib.get_group(U9G)['dG_Mut2_GUAA_1']
+TLR_bp11nTR_GUAA = grouped_lib.get_group(bp_11ntR)['dG_Mut2_GUAA_1']
 
 
 TLR_medians = [TLR_11ntR_GAAA.median(),TLR_11ntR_GUAA.median(),TLR_IC3_GAAA.median(),TLR_IC3_GUAA.median(),TLR_VC2_GAAA.median(),TLR_VC2_GUAA.median()]
 TLR_std = [TLR_11ntR_GAAA.std(),TLR_11ntR_GUAA.std(),TLR_IC3_GAAA.std(),TLR_IC3_GUAA.std(),TLR_VC2_GAAA.std(),TLR_VC2_GUAA.std()]
 plt.bar(range(6),TLR_medians,yerr=TLR_std)
 plt.ylim(-14,-6)
+
+
+
+
+plt.figure()
+TLR_medians = [TLR_bp11nTR_GUAA.median(),TLR_11ntR_GAAA.median(),TLR_IC3_GAAA.median(),TLR_VC2_GAAA.median(),TLR_U9G_GAAA.median()]
+TLR_std = [TLR_bp11nTR_GUAA.std(),TLR_11ntR_GAAA.std(),TLR_IC3_GAAA.std(),TLR_VC2_GAAA.std(),TLR_U9G_GAAA.std()]
+plt.bar(range(5),TLR_medians,yerr=TLR_std)
+plt.ylim(-14,-6)
+
 

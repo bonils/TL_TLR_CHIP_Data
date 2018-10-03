@@ -22,6 +22,7 @@ from scipy.cluster.hierarchy import cophenet
 from scipy.spatial.distance import pdist
 from scipy.cluster.hierarchy import fcluster
 from sklearn.neighbors import NearestNeighbors
+from scipy.stats import pearsonr
 #%%
 dG_threshold = -7.1
 
@@ -136,3 +137,105 @@ plt.scatter(F2['GNRA_confirmed'][mask],F2['ddG_5Mg'][mask],color='black')
 plt.axes().set_aspect('equal')
 plt.ylim([-1,5])
 plt.xlim([-1,1])
+
+#%%
+#import all_receptors being analyzed 
+receptors_types_matrix = pd.read_pickle('receptors_types_matrix.pkl')
+receptors_info = pd.read_pickle('receptor_info.pkl')
+
+details_11ntR = pd.read_csv(data_path + 'details_11ntR_found.csv' )
+details_11ntR['receptor_sequence'] = details_11ntR['receptor_sequence'].str.strip("'")
+
+details_IC3 = pd.read_csv(data_path + 'details_IC3_found.csv' )
+details_IC3['receptor_sequence'] = details_IC3['receptor_sequence'].str.strip("'")
+
+details_VC2 = pd.read_csv(data_path + 'details_VC2_found.csv' )
+details_VC2['receptor_sequence'] = details_VC2['receptor_sequence'].str.strip("'")
+
+details_all = pd.concat([details_11ntR,details_IC3,details_VC2])
+
+#import data from csv files 
+entire_lib = pd.read_csv(data_path + 'tectorna_results_tertcontacts.180122.csv')
+#Drop repeats, just because they are there; is the same data
+entire_lib = entire_lib.drop_duplicates(subset ='seq')
+#Consider the ones only with normal closing base pair 
+mask = entire_lib.b_name == 'normal' 
+entire_lib_normal_bp = entire_lib[mask]
+lib_data = entire_lib_normal_bp.copy()
+
+receptor_data = lib_data.groupby('r_seq')
+wt_11ntR = receptor_data.get_group('UAUGG_CCUAAG')
+scaffolds = list(set(wt_11ntR['old_idx']))
+wt_11ntR = wt_11ntR.set_index('old_idx')
+#%%
+#lets_just analyze L5b-P6 for now
+L5b_P6 = details_all[details_all['location'] == "'L2_P3'"]
+L5b_P6 = L5b_P6[L5b_P6['GNRA_found'] == 1]
+L5b_P6 = L5b_P6.groupby('receptor_sequence')
+#
+
+
+condition = 'dG_Mut2_GAAA_5mM_150mMK_1'
+#create a dataframe with frequency vs ddG wrt to 11ntR only for L5bP6
+#for now only for 11ntRs 
+all_receptors = receptors_info#[receptors_info['type'] == 'other']
+ddG_list = []
+frequency_list = []
+n_for_r_list = []
+r_list = []
+p_list = []
+
+counter = 0
+for receptor in all_receptors.index:
+    variant = receptor_data.get_group(receptor)
+    variant = variant.set_index('old_idx')
+    variant = variant.reindex(scaffolds)
+    ddG = variant[condition].subtract(wt_11ntR[condition])
+    ddG_list.append(ddG.median())
+    
+    wt_for_r = wt_11ntR['dG_Mut2_GAAA'].copy()
+    variant_for_r = variant['dG_Mut2_GAAA'].copy()
+    wt_for_r[wt_for_r > -7.1] = np.nan
+    variant_for_r[variant_for_r > -7.1] = np.nan
+    bad_data = wt_for_r.isna() | variant_for_r.isna()
+    n_for_r_list.append(50 - bad_data.sum())
+    
+    if (50 - bad_data.sum()) >= 4:
+        data_clean = pd.concat([wt_for_r,variant_for_r],axis =1)
+        data_clean = data_clean.dropna()
+        data_clean.columns = ['column_1', 'column_2']
+        r,p = pearsonr(data_clean['column_1'],data_clean['column_2'])
+        r_list.append(r)
+        p_list.append(p)
+    else:
+        r_list.append(np.nan)
+        p_list.append(np.nan)
+    if receptor in list(L5b_P6.groups.keys()):
+        variant_freq = L5b_P6.get_group(receptor)
+        frequency_list.append(variant_freq['GNRA_found'].sum())
+    else:
+        frequency_list.append(0)
+
+L5b_P6_df = pd.DataFrame(index = all_receptors.index)
+L5b_P6_df['frequency'] = frequency_list
+L5b_P6_df['ddG_30mM_Mg'] = ddG_list
+L5b_P6_df['r_pearson'] = r_list
+L5b_P6_df['p_value'] = p_list
+L5b_P6_df['n_for_comparison'] = n_for_r_list
+L5b_P6_df['r_sq'] = L5b_P6_df['r_pearson']**2
+
+
+A = L5b_P6_df[L5b_P6_df['frequency'] > 0]
+
+B = A['ddG_30mM_Mg'].corr(A['frequency'].apply(np.log10))
+
+print('the correlation is')
+print(B)
+
+print('the mean r value is ')
+print(A['r_sq'].median())
+
+plt.scatter(A['frequency'].apply(np.log10),A['ddG_30mM_Mg'])
+plt.figure()
+plt.hist(A['r_sq'].dropna())
+        
