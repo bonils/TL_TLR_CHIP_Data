@@ -1,0 +1,60 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Oct  5 14:30:39 2018
+
+@author: Steve
+"""
+# import libraries
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+from matplotlib.pyplot import *
+import scipy.cluster.hierarchy as sch
+import sklearn.decomposition as skd
+from scipy.cluster.hierarchy import cophenet
+from scipy.spatial.distance import pdist
+from scipy.cluster.hierarchy import fcluster
+from sklearn.neighbors import NearestNeighbors
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import mean_squared_error
+from math import sqrt
+import random
+
+'''--------------Import Functions--------------''' 
+from clustering_functions import get_dG_for_scaffold
+from clustering_functions import doPCA
+from clustering_functions import interpolate_mat_knn
+from clustering_functions import prep_data_for_clustering_ver2
+from clustering_functions import prep_data_for_clustering_ver3
+
+
+'''---------------General Variables-------------'''
+dG_threshold = -7.1 #kcal/mol; dG values above this are not reliable
+dG_replace = -7.1 # for replacing values above threshold. 
+nan_threshold = 0.50 #amount of missing data tolerated.
+num_neighbors = 10
+#for plotting
+low_lim = -14
+high_lim = -6
+#%%
+'''---------------Import data ------------------'''
+data_path = '/Users/Steve/Desktop/Data_analysis_code/Data/'
+TAR_lib = pd.read_csv(data_path + 'tectorna_results_tarjunctions.180122.csv')
+TAR_lib = TAR_lib.drop_duplicates('seq')
+#%%
+unique_names = list(set(TAR_lib['name']))
+#there are 400 unique names
+unique_tar_sequence = list(set(TAR_lib['junction_seq']))
+#there are 462 unique tar sequences --> some sequences were given the same name.
+#%%
+TAR_lib_grouped = TAR_lib.groupby('name')
+
+
+
+
+
+

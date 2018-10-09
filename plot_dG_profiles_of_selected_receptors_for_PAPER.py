@@ -11,7 +11,7 @@ TLR11ntR_AC = 'UAUGG_CCUACG'
 U9G = 'UAGGG_CCUAAG'
 bp_11ntR = 'UUAGG_CCUAAG'
 '''Sequence to plot wrt to 11ntR'''
-alt_TLR_seq = bp_11ntR
+alt_TLR_seq = 'UAUGG_CCUAAA'
 #maybe a favorite 'CAUGG_CCUACG'
 #'UAGGG_CCUAAG'
 
@@ -23,8 +23,8 @@ color_to_plot = 'white'
 condition = 'dG_Mut2_GAAA'  # for 30 mM Mg
 error = 'dGerr_Mut2_GAAA'
 
-condition2 = 'dG_Mut2_GUAA_1'
-error2 = 'dGerr_Mut2_GUAA_1'
+condition2 = 'dG_Mut2_GAAA'
+error2 = 'dGerr_Mut2_GAAA'
 
 
 #plot GUAA too??
@@ -267,5 +267,32 @@ TLR_medians = [TLR_bp11nTR_GUAA.median(),TLR_11ntR_GAAA.median(),TLR_IC3_GAAA.me
 TLR_std = [TLR_bp11nTR_GUAA.std(),TLR_11ntR_GAAA.std(),TLR_IC3_GAAA.std(),TLR_VC2_GAAA.std(),TLR_U9G_GAAA.std()]
 plt.bar(range(5),TLR_medians,yerr=TLR_std)
 plt.ylim(-14,-6)
+
+
+#%% plot ddG instead 
+
+wt_data = grouped_lib.get_group('UAUGG_CCUAAG')
+wt_data = wt_data.set_index('old_idx')
+wt_data = wt_data.reindex(all_scaffolds)
+IC3_data = grouped_lib.get_group(IC3)
+IC3_data = IC3_data.set_index('old_idx')
+IC3_data = IC3_data.reindex(all_scaffolds)
+VC2_data = grouped_lib.get_group(VC2)
+VC2_data = VC2_data.set_index('old_idx')
+VC2_data = VC2_data.reindex(all_scaffolds)
+
+
+ddG_IC3 = IC3_data['dG_Mut2_GAAA'].subtract(wt_data['dG_Mut2_GAAA']).median()
+std_IC3 = IC3_data['dG_Mut2_GAAA'].subtract(wt_data['dG_Mut2_GAAA']).std()
+
+ddG_VC2 = VC2_data['dG_Mut2_GAAA'].subtract(wt_data['dG_Mut2_GAAA']).median()
+std_VC2 = VC2_data['dG_Mut2_GAAA'].subtract(wt_data['dG_Mut2_GAAA']).std()
+
+plt.figure()
+ddGs = [ddG_IC3,ddG_VC2]
+stds = [std_IC3,std_VC2]
+plt.bar(range(2),ddGs,yerr=stds)
+
+
 
 

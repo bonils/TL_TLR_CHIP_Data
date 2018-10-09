@@ -539,6 +539,67 @@ specificity_median_df = pd.DataFrame(index=data_sM_11ntR.index,data = d)
 plt.bar(range(0,34),specificity_median_df.specificity_median,yerr=specificity_median_df.specificity_std)
 plt.ylim([-1,6])
 plt.xlim(-1,34)
+#%%plot dG binds for GAAA and for GUAA in bar plots
+
+colorsl = ['purple','purple','purple','yellow','yellow','yellow','orange','orange','orange',
+           'yellow','yellow','yellow','red','red','red','red','red','red','yellow','yellow','yellow',
+           'yellow','yellow','yellow','green','green','green','green','green','green','purple','purple',
+           'purple','black']
+
+#medians accross all scaffolds for each single mutant
+median_GAAA = []
+std_GAAA =[]
+median_GUAA = []
+std_GUAA = []
+
+for receptor in data_sM_11ntR.index:
+    dG_GAAA = data_sM_11ntR.loc[receptor][data_sM_11ntR.columns[0:50]]
+    median_GAAA.append(dG_GAAA.median())
+    std_GAAA.append(dG_GAAA.std())
+    dG_GUAA = data_sM_11ntR.loc[receptor][data_sM_11ntR.columns[150:200]]
+    median_GUAA.append(dG_GUAA.median())    
+    std_GUAA.append(dG_GUAA.std())
+d = {'GAAA':median_GAAA, 'GUAA':median_GUAA, 'std_GAAA':std_GAAA, 'std_GUAA':std_GUAA}    
+median_GUAA_GAAA = pd.DataFrame(d,index=data_sM_11ntR.index)
+A = - 1 * median_GUAA_GAAA[['GAAA','GUAA']]
+color_df = pd.DataFrame(index= A.index)
+color_df['color'] = colorsl
+colors_2 = [[color] * 2 for color in colorsl]
+colors_3 = [color for colorlist in colors_2 for color in colorlist]
+A.plot(kind='bar', color=color_df['color'], yerr = median_GUAA_GAAA[['std_GAAA','std_GUAA']],edgecolor = 'black')
+plt.ylim(6,12)
+#%%
+plt.figure()
+plt.figure(figsize=(20, 3))
+plt.bar(range(34),A ['GAAA'],color = colorsl,edgecolor = 'black',align = 'edge',width = 0.35,yerr=median_GUAA_GAAA['std_GAAA'] )
+plt.bar(range(34,34*2),A ['GUAA'],color = 'white',edgecolor = colorsl,align = 'edge',width = 0.35,yerr=median_GUAA_GAAA['std_GUAA']  )
+plt.ylim(6,12)
+plt.plot([0,70],[7.1,7.1],'--')
+
+#%%
+plt.scatter(A['GAAA'],A['GUAA'])
+plt.xlim(7,12)
+plt.ylim(7,12)
+#%%
+plt.figure()
+plt.figure(figsize=(20, 3))
+A['GAAA'].plot(kind='bar',color = colorsl,edgecolor = 'black',yerr= median_GUAA_GAAA['std_GAAA'],align = 'edge',width = 0.3)
+plt.ylim(6,12)
+plt.plot([0,34],[7.1,7.1],'--')
+
+A['GUAA'].plot(kind='bar',color = colorsl,edgecolor = 'black',yerr= median_GUAA_GAAA['std_GUAA'])
+plt.ylim(6,12)
+plt.plot([0,34],[7.1,7.1],'--')
+
+
+
+#%%
+plt.figure
+
+
+
+
+
 #%% Write a function that calculates bootstraps pearson correlation coefficients
 #and 95% confidence interval 
 def pearson_bootsrap (x_data,y_data,n_boostraps):

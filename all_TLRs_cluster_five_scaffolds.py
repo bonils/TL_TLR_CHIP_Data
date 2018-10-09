@@ -119,12 +119,12 @@ unique_receptors = sorted(list(set(list(entire_lib_selected.r_seq))))
 #%% Start analyzing only five scaffolds, create dataframe with all data (5scaffolds * conditions)
 # for eact TLR ina a single row.
 scaffolds_five = ['13854','14007','14073','35311_A','35600']
-aa = canonical.copy()
-aa = aa.set_index('old_idx')
-aa = aa['dG_Mut2_GAAA']
-aa = aa.loc[scaffolds_five]
-aa = aa.sort_values()
-scaffolds_five = list(aa.index)
+#aa = canonical.copy()
+#aa = aa.set_index('old_idx')
+#aa = aa['dG_Mut2_GAAA']
+#aa = aa.loc[scaffolds_five]
+#aa = aa.sort_values()
+#scaffolds_five = list(aa.index)
 #%%
 data = entire_lib_selected
 conditions = ['dG_Mut2_GAAA']#, 'dG_Mut2_GUAA_1']
@@ -462,7 +462,7 @@ list_PCAs = list(transformed.columns[:num_PCA])
 z_pca = sch.linkage(transformed.loc[:,list_PCAs],method='ward',optimal_ordering=True) 
 cg_pca = sns.clustermap(prep_data_norm_with_nan,row_linkage=z_pca, col_cluster=False
                         ,row_cluster=True, vmin=-3.2,vmax=3.2,cmap='coolwarm')
-cg_pca.savefig('/Volumes/NO NAME/Clustermaps/five_scaff_02_10_2018.svg')
+#cg_pca.savefig('/Volumes/NO NAME/Clustermaps/five_scaff_02_10_2018.svg')
 
 
 cg_receptors= sns.clustermap(receptors_types_matrix,row_linkage=z_pca, col_cluster=False,
@@ -488,7 +488,7 @@ wt_types_matrix.type_inVitro[receptor_info.index == 'GAAGGG_CCCCACGC'] = 1
 
 cg_receptors= sns.clustermap(wt_types_matrix,row_linkage=z_pca, col_cluster=False,
                         vmin=0,vmax=1,cmap='Blues')
-cg_receptors.savefig('/Volumes/NO NAME/Clustermaps/clustermap_receptors_WT.svg')
+#cg_receptors.savefig('/Volumes/NO NAME/Clustermaps/clustermap_receptors_WT.svg')
 #%%
 reordered_data = pd.DataFrame(index = range(0,len(prep_data_norm)))
 reordered_data['name'] = list(prep_data_norm.index)
