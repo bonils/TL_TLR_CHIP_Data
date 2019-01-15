@@ -69,6 +69,11 @@ WT_data = WT_data.set_index('old_idx')
 AC_data = grouped_lib.get_group('UAUGG_CCUACG')
 AC_data = AC_data.set_index('old_idx')
 AC_data = AC_data.reindex(WT_data.index)
+
+#%% TESTING 
+sublib0 = entire_lib_normal_bp[entire_lib_normal_bp.sublibrary == 'tertcontacts_0']
+sublib_old_idx = sublib0.groupby('old_idx')
+
 #%%
 A = pd.concat([WT_data['dG_Mut2_GAAA'],AC_data['dG_Mut2_GAAA']],axis=1)
 A_avg = A.mean(axis=1)
@@ -177,7 +182,6 @@ number_condition = conditions.sum(axis=1)
 limit = number_condition > 40
 data_50_scaffolds_filtered = data_50_scaffolds[~limit]   
 #add Vc2: this is an important motif I want to keep here
-
 #%%
 ###########################################################################################
 #%  THIS IS FOR CLUSTERING GAAA and GUAA as different TL/TLRs
@@ -272,8 +276,13 @@ cg_pca = sns.clustermap(avg_per_length,row_linkage=z_pca, col_cluster=False
                         ,row_cluster=True, vmin=-12,vmax=-6,cmap='Blues_r')
 #cg_pca.savefig('/Volumes/NO NAME/Clustermaps/fifty_scaff_avg_03_10_2018.svg')
 
+#%%
+distance_threshold = 10
+#distance threshold was set to 2.5 to get the seven clusters that were 
+#plotted in the figure (3 clusters showed 'GUAA behavior' and 4 clusters
+#showed 'GAAA behavior')
 
-distance_threshold = 2.5
+
 plt.plot()
 #sch.dendrogram(z_pca,color_threshold=distance_threshold)
 max_d = distance_threshold
@@ -310,6 +319,56 @@ TLRs_matrix['in_vitro'] = receptors_with_TL == 'in_vitro'
 TLRs_matrix['intermediates'] = receptors_with_TL == 'other'
 cg_pca = sns.clustermap(TLRs_matrix,row_linkage=z_pca, col_cluster=False
                         ,row_cluster=True, vmin=0,vmax=1,cmap='Greys')
+#%%
+TL = []
+for receptors in receptors_with_TL.index:
+    if 'GAAA_' in receptors:
+        TL.append('GAAA')
+    elif 'GUAA_' in receptors:
+        TL.append('GUAA')
+receptors_with_TL['TL'] = TL
+        
+
+
+receptors_with_TL['cluster'] = clustered_data['cluster']
+group_R = receptors_with_TL.copy().groupby('type')
+for types in group_R.groups:
+    next_group = group_R.get_group(types)
+    GAAA_R = next_group[next_group['TL'] == 'GAAA']
+    total_GAAA = len(GAAA_R)
+    print('total GAAA ' + str(types) + '  ' + str(total_GAAA))
+    GAAA_C_1_like = len(GAAA_R[GAAA_R['cluster'] == 1])/total_GAAA
+    GAAA_C_2_like = len(GAAA_R[GAAA_R['cluster'] == 2])/total_GAAA
+    
+    GUAA_R = next_group[next_group['TL'] == 'GUAA']
+    total_GUAA = len(GUAA_R)
+    print('total GUAA ' + str(types) + '  ' + str(total_GUAA))
+    
+    GUAA_C_1_like = len(GUAA_R[GUAA_R['cluster'] == 1])/total_GUAA
+    GUAA_C_2_like = len(GUAA_R[GUAA_R['cluster'] == 2])/total_GUAA
+    plt.figure()
+    width = 0.35
+    C1 = [GAAA_C_1_like,GUAA_C_1_like]
+    C2 = [GAAA_C_2_like,GUAA_C_2_like]
+    plt.bar([1,2],C1,width,color='green',edgecolor='black')
+    plt.bar([1,2],C2,width,bottom=C1,color='red',edgecolor = 'black')
+    plt.ylim(0,1.2)
+    plt.title(str(types))
+    
+#    GUAA_R = next_group[next_group['TL'] == 'GUAA']
+#    #plot fraction of GAAA in each of clusters in a single bar
+#    
+#    
+#    
+#    total = len(next_group['cluster'])
+#    GUAA_like = len(next_group[next_group['cluster'] == 1])/total
+#    GAAA_like = len(next_group[next_group['cluster'] == 2])/total
+#    plt.figure()
+#    plt.bar([1,2],[GUAA_like,GAAA_like])
+#    plt.title(str(types))
+#    plt.ylim(0,1.2)
+
+
 #cg_pca.savefig('/Volumes/NO NAME/Clustermaps/fifty_scaff_avg_length_TLRS_03_10_2018.svg')
 #%%
 clustered_data['type'] = receptors_with_TL['type']
@@ -439,8 +498,8 @@ cumulative = 1 - np.cumsum(pca.explained_variance_ratio_)
 plt.plot(range(len(cumulative)),cumulative)
 
 list_PCAs = list(transformed.columns[:num_PCA])
-#%%
-z_pca = sch.linkage(transformed.loc[:,list_PCAs],method='ward',optimal_ordering=True) 
+#%% THIS IS THE ONE I HAVE BEEN USING FOR THE FIGURES
+z_pca = sch.linkage(transformed.loc[:,list_PCAs],method='ward',optimal_ordering=False) 
 cg_pca = sns.clustermap(prep_data_norm_with_nan,row_linkage=z_pca, col_cluster=False
                         ,row_cluster=True, vmin=-3.2,vmax=3.2,cmap='coolwarm')
 #cg_pca.savefig('/Volumes/NO NAME/Clustermaps/fifty_scaff_02_10_2018.svg')
@@ -450,6 +509,8 @@ cg_pca = sns.clustermap(prep_data_with_nan,row_linkage=z_pca, col_cluster=False
                         ,row_cluster=True)#, vmin=-3.2,vmax=3.2,cmap='coolwarm')
 #%%
 distance_threshold = 22
+#TO GET THE 6 CLUSTERS (10/11/2018) I HAVE BEEN USING A THRESHOLD OF 22 
+
 sch.dendrogram(z_pca,color_threshold=distance_threshold)
 max_d = distance_threshold
 clusters = fcluster(z_pca, max_d, criterion='distance')
@@ -476,7 +537,7 @@ cg_pca_col = sns.clustermap(prep_data_with_nan,row_linkage=z_pca,
 cg_pca = sns.clustermap(prep_data_norm_with_nan,row_linkage=z_pca, col_cluster=False
                         ,row_cluster=True, vmin=-3.2,vmax=3.2,cmap='coolwarm',
                         row_colors = row_color)
-cg_pca.savefig('/Volumes/NO NAME/Clustermaps/fifty_scaff_06_10_2018.svg')
+#cg_pca.savefig('/Volumes/NO NAME/Clustermaps/fifty_scaff_06_10_2018.svg')
 #
 #separate each cluster and save in dictionary
 cluster_names = ['cluster_' + str(i) for i in range(1,number_clusters+1)]
@@ -489,18 +550,27 @@ for counter, names in enumerate (cluster_names):
 for clusters in all_clusters:
     s1,s2 = all_clusters[clusters].shape
     print('There are ',str(s1),' tetraloop-receptors in ', clusters)
+    
+#%%    
+cg_avg= sns.clustermap(mean_per_row,row_linkage=z_pca,
+                            col_cluster=False,row_cluster=True,row_colors=row_color,
+                            vmin = -10, vmax = -7,cmap = 'Blues_r')   
+#cg_avg.savefig('/Volumes/NO NAME/Clustermaps/average_11_10_2018.svg')  
 #%%
 '''----------------Plot a random member of cluster n-------------------'''    
-cluster_to_plot = 'cluster_1'
-#WT_ref = data_50_scaffolds.loc['11ntR'] 
-WT_ref = prep_data_with_nan.loc['UAUGG_CCUAAG']
+cluster_to_plot = 'cluster_6'
+WT_ref = data_50_scaffolds.loc['UAUGG_CCUAAG'] 
+#WT_ref = prep_data_with_nan.loc['UAUGG_CCUAAG']
 next_cluster = all_clusters_nan[cluster_to_plot]
 S1,S2 = next_cluster.shape
 rand_index = np.random.randint(1,S1)
 alternative_TLR = next_cluster.index[rand_index]
-alt_TLR = prep_data_with_nan.loc[alternative_TLR]
+#alt_TLR = prep_data_with_nan.loc[alternative_TLR]
+alternative_TLR = 'UAUGG_CCUGGG'
+alt_TLR = data_50_scaffolds.loc[alternative_TLR]
 r_pearson = alt_TLR.corr(WT_ref)
 
+color_to_use = 'magenta'
 #%Colors to used for scatter plotting
 receptors_sublib0 = sorted(list(set(sublib0['r_name'])))
 scaffolds_length = pd.concat([sublib0['old_idx'],sublib0['length']],axis=1)
@@ -509,10 +579,10 @@ scaffolds_length = scaffolds_length.sort_values(by=['length'])
 scaffolds_sublib0 = list(scaffolds_length['old_idx'])
 scaffolds_length = scaffolds_length.set_index('old_idx')
 Color_length =scaffolds_length['length'].copy()
-Color_length[Color_length == 8] = 'magenta'
-Color_length[Color_length == 9] = 'cyan'
-Color_length[Color_length == 10] = 'brown'
-Color_length[Color_length == 11] = 'black'
+Color_length[Color_length == 8] = color_to_use
+Color_length[Color_length == 9] = color_to_use
+Color_length[Color_length == 10] = color_to_use
+Color_length[Color_length == 11] = color_to_use
 
 
 x = [low_lim, dG_threshold] #for plotting  y= x line
@@ -520,9 +590,9 @@ y_thres = [dG_threshold,dG_threshold]
 #x_ddG = [ddG_average + x[0],ddG_average + x[1]]
 #plt.plot(x,x_ddG,'--r',linewidth = 3)
 plt.scatter(WT_ref[0:50],alt_TLR[0:50],s=120,edgecolors='k',c=Color_length,marker='o')
-plt.scatter(WT_ref[50:100],alt_TLR[50:100],s=120,edgecolors='k',c=Color_length,marker='s')
+plt.scatter(WT_ref[50:100],alt_TLR[50:100],s=120,edgecolors='k',c=Color_length,marker='v')
 plt.scatter(WT_ref[100:150],alt_TLR[100:150],s=120,edgecolors='k',c=Color_length,marker='^')
-plt.scatter(WT_ref[150:200],alt_TLR[150:200],s=180,edgecolors='k',c=Color_length,marker='*')
+plt.scatter(WT_ref[150:200],alt_TLR[150:200],s=180,edgecolors='k',c=Color_length,marker='s')
 plt.plot(x,x,':k')
 plt.plot(x,y_thres,':k',linewidth = 0.5)
 plt.plot(y_thres,x,':k',linewidth = 0.5)
@@ -579,13 +649,13 @@ cg_length= sns.clustermap(GUAA_by_length_norm,row_linkage=z_pca, col_cluster=Fal
 
 cg_length= sns.clustermap(GAAA_by_length_norm,row_linkage=z_pca, col_cluster=False,
                         row_colors = row_color, cmap = 'coolwarm',vmin = -1.5,vmax = 1.5)
-cg_length.savefig('/Volumes/NO NAME/Clustermaps/GAAA_length_06_10_2018.svg')
+#cg_length.savefig('/Volumes/NO NAME/Clustermaps/GAAA_length_06_10_2018.svg')
 #%% Plot recepto types based on clustering above
 receptors_types = receptors_types_matrix.copy()
 receptors_types = receptors_types.reindex(prep_data_norm_with_nan.index)
 cg_receptors= sns.clustermap(receptors_types,row_linkage=z_pca, col_cluster=False,
                         vmin=0,vmax=1,cmap='Greys',row_colors = row_color)
-cg_receptors.savefig('/Volumes/NO NAME/Clustermaps/receptors_06_10_2018.svg')
+#cg_receptors.savefig('/Volumes/NO NAME/Clustermaps/receptors_06_10_2018.svg')
 #%% Plot specificty based on clustering above
 #calculate average TL specificity
 GAAA = prep_data_with_nan[prep_data_with_nan.columns[0:50]].copy()
@@ -601,7 +671,7 @@ mean_specificity = specificity.mean(axis=1)
 cg_pca = sns.clustermap(mean_specificity,row_linkage=z_pca, col_cluster=False
                         ,row_cluster=True, vmin=-3.5,vmax=1,cmap='coolwarm',
                         row_colors = row_color)
-cg_pca.savefig('/Volumes/NO NAME/Clustermaps/specificity_02_10_2018.svg')
+#cg_pca.savefig('/Volumes/NO NAME/Clustermaps/specificity_02_10_2018.svg')
 #%%
 #calculate spearman R relate to WT 
 WT_GAAA = GAAA.loc['UAUGG_CCUAAG']

@@ -10,26 +10,31 @@ IC3 = 'GAGGG_CCCUAAC'
 TLR11ntR_AC = 'UAUGG_CCUACG'
 U9G = 'UAGGG_CCUAAG'
 bp_11ntR = 'UUAGG_CCUAAG'
+
+
 '''Sequence to plot wrt to 11ntR'''
-alt_TLR_seq = 'UAUGG_CCUAAA'
+alt_TLR_seq = VC2
+#'UAGGA_UCUAAG'
 #maybe a favorite 'CAUGG_CCUACG'
 #'UAGGG_CCUAAG'
+#'CAUGG_CCUACG' --> triple mutants with ~ 2 kcal/mol effect 
 
-
-color_to_plot = 'white'
+color_to_plot = 'navy'
 
 
 '''Condition to compare'''
 condition = 'dG_Mut2_GAAA'  # for 30 mM Mg
 error = 'dGerr_Mut2_GAAA'
 
-condition2 = 'dG_Mut2_GAAA'
+condition2 = 'dG_Mut2_GAAA' 
 error2 = 'dGerr_Mut2_GAAA'
 
+#'dG_Mut2_GAAA' 
+#'dG_Mut2_GAAA_5mM_150mMK_1'
 
 #plot GUAA too??
 
-plot_GUAA = True
+plot_GUAA = False
 
 
 
@@ -159,10 +164,10 @@ diff = data - ddG_average
 #%%
 #Color based on the length of the CHIP piece 
 Colors = WT_11ntR.length.copy()
-Colors[Colors == 8] = color_to_plot#'red'
-Colors[Colors == 9] = color_to_plot#'blue'
-Colors[Colors == 10] = color_to_plot#'orange'
-Colors[Colors == 11] = color_to_plot#'black'
+Colors[Colors == 8] = 'magenta'#color_to_plot#'red'
+Colors[Colors == 9] = 'black'#color_to_plot#'blue'
+Colors[Colors == 10] = 'white' #color_to_plot#'orange'
+Colors[Colors == 11] = 'green' #color_to_plot#'black'
 
 #%%
 if plot_original:

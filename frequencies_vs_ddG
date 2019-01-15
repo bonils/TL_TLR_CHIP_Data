@@ -102,7 +102,28 @@ plt.scatter(F['log_freq'],F['ddG_5Mg150K'])
 print(F['log_freq'].corr(F['ddG_5Mg']))
 plt.figure()
 plt.scatter(F['log_freq'],F['ddG_5Mg'])
+
 #%%
+def adjustFigAspect(fig,aspect=1):
+    '''
+    Adjust the subplot parameters so that the figure has the correct
+    aspect ratio.
+    '''
+    xsize,ysize = fig.get_size_inches()
+    minsize = min(xsize,ysize)
+    xlim = .4*minsize/xsize
+    ylim = .4*minsize/ysize
+    if aspect < 1:
+        xlim *= aspect
+    else:
+        ylim /= aspect
+    fig.subplots_adjust(left=.5-xlim,
+                        right=.5+xlim,
+                        bottom=.5-ylim,
+                        top=.5+ylim)
+#%%
+#plot frequency vs ddG for 30 mM Mg    
+    
 plt.figure()
 sns.regplot(F['log_freq'],F['ddG_30Mg'],color='black')
 plt.axes().set_aspect('equal')
@@ -114,16 +135,28 @@ plt.axes().set_aspect('equal')
 plt.ylim([-1,5])
 plt.xlim([-1,1])
 
-plt.figure()
-sns.regplot(F['log_freq'],F['ddG_5Mg150K'],color='black')
-plt.axes().set_aspect('equal')
+#%%
+#plot frequency vs ddG for 5 mM Mg + 150 mM K
+
+fig = plt.figure()
+sns.regplot(F['log_freq'],F['ddG_5Mg150K'],color='blue', scatter_kws={'s':120,'edgecolors':'black'})
+#plt.axes().set_aspect('equal')
+adjustFigAspect(fig,aspect=0.9)
+ax = fig.add_subplot(111)
+
+#%%
+
 plt.ylim([-1,5])
 
 plt.figure()
-plt.scatter(F2['GNRA_confirmed'],F2['ddG_5Mg150K'],color='black')
+plt.scatter(F2['GNRA_confirmed'],F2['ddG_5Mg150K'],color='blue',s = 120,edgecolors = 'black')
 plt.axes().set_aspect('equal')
 plt.ylim([-1,5])
 plt.xlim([-1,1])
+
+
+#%%
+#plot frequency vs ddG for 5 mM Mg + 150 mM K
 
 mask = F['ddG_5Mg'] < 4.9
 plt.figure()

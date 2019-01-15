@@ -21,6 +21,7 @@ from sklearn.neighbors import NearestNeighbors
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error
+from sklearn.metrics.pairwise import euclidean_distances
 from math import sqrt
 import random
 
@@ -40,18 +41,822 @@ num_neighbors = 10
 #for plotting
 low_lim = -14
 high_lim = -6
+
+
+selection_orientation = True
 #%%
 '''---------------Import data ------------------'''
 data_path = '/Users/Steve/Desktop/Data_analysis_code/Data/'
 TAR_lib = pd.read_csv(data_path + 'tectorna_results_tarjunctions.180122.csv')
 TAR_lib = TAR_lib.drop_duplicates('seq')
+TAR_lib['context'] = 'length' + TAR_lib['length'].apply(str) + '_' + 'sub' + \
+                     TAR_lib['helix_one_length'].apply(str) +\
+                     '_' + TAR_lib['h_name'] 
+TAR_lib['full_name'] = TAR_lib['junction_seq'] + '_' + TAR_lib['name'] 
+sublib0 = TAR_lib[TAR_lib['sublibrary'] == 'tarjunctions_0']
+sublib1 = TAR_lib[TAR_lib['sublibrary'] == 'tarjunctions_1']
+sublib2 = TAR_lib[TAR_lib['sublibrary'] == 'tarjunctions_2']
+
+contexts_0 = list(set(sublib0['context']))
+contexts_1 = list(set(sublib1['context']))
+contexts_2 = list(set(sublib2['context']))
+
+#%%
+#upload kint turn data
+KT_Data = pd.read_pickle(data_path + 'KT_data_Steve.pkl')
+KT_matrix = pd.read_pickle(data_path + 'orientation_1_KT.pkl')
+
+#%%
+#organize contexts wrt stability of WT
+WT_name = 'AUCUGA_UCU_WT_TAR'
+WT_reverse_name = 'UCU_AUCUGA_WT_TAR'
+WT_TAR = sublib0[sublib0['full_name'] == 'AUCUGA_UCU_WT_TAR']
+WT_TAR_context1 = WT_TAR[WT_TAR['context'].isin(contexts_1)]
+WT_TAR_context1 = WT_TAR_context1.set_index('context')
+WT_TAR_context1 = WT_TAR_context1.reindex(contexts_1)
+WT_TAR_context1 =  WT_TAR_context1.sort_values('dG_Mut2_GAAA')
+#%%
+#reorganized contexts 
+contexts_1 = list(WT_TAR_context1.index)
+# analyze sublibraries 0 and 1
+#these apparently were done with ~34 different contexts. 
+sublibs_0_1 = pd.concat([sublib0,sublib1],axis =0)
+#%%
+orientation = []
+for sequence in sublibs_0_1['junction_seq']:
+    if (sequence[-3:] == 'UCU') | (sequence[-3:] == 'GCU'):
+        orientation.append(1)
+    else:
+        orientation.append(2)
+        
+sublibs_0_1['orientation'] = orientation        
+#%%
+if selection_orientation:
+    sublibs_0_1_ori1 = sublibs_0_1[sublibs_0_1['orientation'] == 1]
+    sublibs_0_1_ori2 = sublibs_0_1[sublibs_0_1['orientation'] == 2]
+#%%    
+#analyze each orientation separately first and then concataneta them    
+sublibs_0_1_ori1 = pd.concat([sublibs_0_1_ori1,sublib2])
+
+#%%
+eight_bp = sublibs_0_1_ori1[(sublibs_0_1_ori1['length'] == 8) & (sublibs_0_1_ori1['helix_one_length'] == 3)]
+eight_bp = eight_bp.groupby('name')
+nine_bp = sublibs_0_1_ori1[(sublibs_0_1_ori1['length'] == 9) & (sublibs_0_1_ori1['helix_one_length'] == 3)]
+nine_bp = nine_bp.groupby('name')
+ten_bp =  sublibs_0_1_ori1[(sublibs_0_1_ori1['length'] == 10) & (sublibs_0_1_ori1['helix_one_length'] == 3)]
+ten_bp = ten_bp.groupby('name')
+
+#%%
+names_sublib2 = list(set(sublib2['name']))
+names_sublib2.pop(0)
+list_names = []
+for names in names_sublib2:
+    if ('WTbulge' in names) | ('3Ubulge' in names) | ('3Cbulge' in names):
+        list_names.append(names)
+
+#%%
+three_bulges = ['WT_CUC_control','WT_TAR','WT_3U','WT_AGA_control','WT_no_bulge']
+#three_bulges = three_bulges + list_names
+
+conditions = ['dG_Mut2_GAAA','dG_Mut2_GAAA_5mM_2','dG_Mut2_GAAA_5mM_150mMK_1']
+TAR_KT = pd.DataFrame(0,index = three_bulges, columns = KT_matrix.columns)
+#
+for sequences in TAR_KT.index:
+    data_5 = [eight_bp.get_group(sequences)[conditions[1]].median(),
+              nine_bp.get_group(sequences)[conditions[1]].median(),
+              ten_bp.get_group(sequences)[conditions[1]].median()]
+    data_30 = [eight_bp.get_group(sequences)[conditions[0]].median(),
+              nine_bp.get_group(sequences)[conditions[0]].median(),
+              ten_bp.get_group(sequences)[conditions[0]].median()]    
+    data_K = [eight_bp.get_group(sequences)[conditions[2]].median(),
+              nine_bp.get_group(sequences)[conditions[2]].median(),
+              ten_bp.get_group(sequences)[conditions[2]].median()] 
+    all_conditions = data_5 + data_30 + data_K
+    TAR_KT.loc[sequences] = all_conditions
+
+KT_matrix = pd.concat([KT_matrix,TAR_KT])
+KT_matrix.to_pickle(data_path + 'KT_plus_TAR.pkl')
+
+
+#
+limit_mask = KT_matrix > dG_threshold
+KT_matrix_thr = KT_matrix.copy()
+KT_matrix_thr[limit_mask] = dG_threshold
+
+#cg = sns.clustermap(KT_matrix_thr)
+high_salt = KT_matrix_thr[KT_matrix_thr.columns[3:6]]
+mean_salt = high_salt.mean(axis = 1)
+#
+high_salt_nom = high_salt.sub(mean_salt,axis=0)
+#
+
+KT_matrix_norm = KT_matrix_thr.sub(KT_matrix_thr.mean(axis = 1),axis = 0)
+KT_matrix_norm = KT_matrix_norm[['30mM_Mg_8_fwd','30mM_Mg_9_fwd','30mM_Mg_10_fwd',
+                            '5mM_Mg_8_fwd','5mM_Mg_9_fwd','5mM_Mg_10_fwd',
+                            '5mM_Mg_K_8_fwd','5mM_Mg_K_9_fwd','5mM_Mg_K_10_fwd']]
+
+
+#
+num_PCA = 4
+#8
+pca,transformed,loadings = doPCA(KT_matrix_norm)
+#plot explained variance by PC
+plt.figure()
+pd.Series(pca.explained_variance_ratio_).plot(kind='bar')
+plt.ylabel('fraction of variance \nexplained by each PC', fontsize=14)
+
+plt.tight_layout()
+print('Fraction explained by the first ',str(num_PCA), 'PCAs :',sum(pca.explained_variance_ratio_[:num_PCA]))
+list_PCAs = list(transformed.columns[:num_PCA])
+
+z_pca = sch.linkage(transformed.loc[:,list_PCAs],method='ward',optimal_ordering=True) 
+X = transformed.loc[:,list_PCAs]
+c, coph_dists = cophenet(z_pca, pdist(X))
+print('cophenetic distance: ',c)
+#%%
+cg = sns.clustermap(KT_matrix_norm,row_linkage= z_pca,col_cluster=False,cmap ='coolwarm')
+#cg.savefig('/Volumes/NO NAME/Clustermaps/TAR_KT.svg')
+                   # vmin = -4, vmax = 2.5)#
+#%%#
+KT1 = pd.DataFrame(index =KT_matrix_norm.index)
+
+KT1_list = []
+for idx in KT1.index:
+    if '23S Kt-7 single' in idx:
+        KT1_list.append(1)
+    else:
+        KT1_list.append(0)
+KT1['name'] = KT1_list
+cg = sns.clustermap(KT1,row_linkage= z_pca,col_cluster=False,cmap ='Greys')        
+#cg.savefig('/Volumes/NO NAME/Clustermaps/23S_KT.svg')           
+  
+KT2 = pd.DataFrame(index =KT_matrix_norm.index)
+KT2_list = []
+for idx in KT2.index:
+    if 'box C/D' in idx:
+        KT2_list.append(1)
+    else:
+        KT2_list.append(0)
+KT2['name'] = KT2_list
+cg = sns.clustermap(KT2,row_linkage= z_pca,col_cluster=False,cmap ='Greys')    
+cg.savefig('/Volumes/NO NAME/Clustermaps/box_CD_KT.svg')     
+
+bulges = pd.DataFrame(index =KT_matrix_norm.index)
+bulges_list = []
+for idx in bulges.index:
+    if ('WT_CUC_control' in idx) | ('WT_TAR' in idx) | ('WT_3U' in idx)  :
+        bulges_list.append(1)
+    else:
+        bulges_list.append(0)
+bulges['name'] = bulges_list
+cg = sns.clustermap(bulges,row_linkage= z_pca,col_cluster=False,cmap ='Greys')
+cg.savefig('/Volumes/NO NAME/Clustermaps/3Bulges_KT.svg')         
+
+
+
+no_bulges = pd.DataFrame(index =KT_matrix_norm.index)
+no_bulges_list = []
+for idx in no_bulges.index:
+    if ('no_bulge' in idx) :
+        no_bulges_list.append(1)
+    else:
+        no_bulges_list.append(0)
+no_bulges['name'] = no_bulges_list
+cg = sns.clustermap(no_bulges,row_linkage= z_pca,col_cluster=False,cmap ='Greys')  
+cg.savefig('/Volumes/NO NAME/Clustermaps/nobulges.svg')
+
+
+
+other_KT  = pd.DataFrame(index =KT_matrix_norm.index)
+other_KT_list = []
+for i in range(len(no_bulges_list)):
+    if (no_bulges_list[i] == 0) & (bulges_list[i] == 0) & (KT2_list[i] == 0) &  (KT1_list[i] == 0):
+        other_KT_list.append(1)
+    else:
+        other_KT_list.append(0)
+other_KT['name'] = other_KT_list
+cg = sns.clustermap(other_KT,row_linkage= z_pca,col_cluster=False,cmap ='Greys')  
+cg.savefig('/Volumes/NO NAME/Clustermaps/other_KT.svg')        
+  
+
+#%%
+bulges = pd.DataFrame(index =KT_matrix_norm.index)
+bulges_list = []
+for idx in bulges.index:
+    if ('WT_3U' in idx):
+        bulges_list.append(1)
+    else:
+        bulges_list.append(0)
+bulges['name'] = bulges_list
+cg = sns.clustermap(bulges,row_linkage= z_pca,col_cluster=False,cmap ='Greys')
+#cg.savefig('/Volumes/NO NAME/Clustermaps/3Bulges_KT.svg')         
+
+#%%
+bulges = pd.DataFrame(index =KT_matrix_norm.index)
+bulges_list = []
+for idx in bulges.index:
+    if (idx == '23S Kt-7'):
+        bulges_list.append(1)
+    else:
+        bulges_list.append(0)
+bulges['name'] = bulges_list
+cg = sns.clustermap(bulges,row_linkage= z_pca,col_cluster=False,cmap ='Greys')
+#cg.savefig('/Volumes/NO NAME/Clustermaps/3Bulges_KT.svg')   
+
+#%%
+A = KT_matrix_thr.mean(axis = 1)
+cg = sns.clustermap(A,row_linkage= z_pca,col_cluster=False,cmap = 'Blues_r', vmin = -10, vmax = -7)
+cg.savefig('/Volumes/NO NAME/Clustermaps/KT_means.svg')
+
+
+
+
+#%%
+#%cluster wrt data subtracted by average across rows
+distance_threshold = 6
+plt.plot()
+sch.dendrogram(z_pca,color_threshold=distance_threshold)
+max_d = distance_threshold
+
+clusters = fcluster(z_pca, max_d, criterion='distance')
+number_clusters = max(clusters)
+print('number of clusters based on distance of ',str(max_d), ':', str(number_clusters))
+# Append cluster number to dataframe with data
+clustered_data = norm_data_34_nan.copy()
+cluster_series = pd.Series(clusters,index=clustered_data.index)
+clustered_data['cluster'] = cluster_series
+#Replot clustergram with rows colored as above
+row_color = pd.Series(clusters,index=clustered_data.index)
+cluster_colors = ['g','r','c','m','y','k','b','orange','g','r','c','m','y','k','b']
+num_clusters = len(cluster_series.unique())
+num_clusters
+for i in range(num_clusters):
+    row_color[row_color == (i+1)] = cluster_colors[i]
+cg = sns.clustermap(norm_data_34_nan,row_linkage=z_pca, col_cluster=False
+                    ,row_cluster=True, row_colors = row_color,cmap ='coolwarm',
+                    vmin = -4, vmax = 2.5)#
+#cg.savefig('/Volumes/NO NAME/Clustermaps/TAR.svg')
+
+
+cg = sns.clustermap(data_34_thres.reindex(norm_data_34_nan.index),row_linkage=z_pca, col_cluster=False
+                    ,row_cluster=True, row_colors = row_color, cmap = 'Blues_r', vmin = -12, vmax = -7)
+#cg.savefig('/Volumes/NO NAME/Clustermaps/original_dG_TAR.svg')
+cg = sns.clustermap(avg_row,row_linkage=z_pca, col_cluster=False
+                    ,row_cluster=True, row_colors = row_color,cmap ='Blues_r',
+                    vmin = -9, vmax=-8)#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#%%    
+#how many different sequences are there in this sublibrary
+TAR_sequences = list(set(sublibs_0_1['junction_seq']))
+#TAR_names = list(set(sublibs_0_1['full_name']))
+TAR_names = list(set(sublibs_0_1['name']))
+#REMEMBER FOR NOW WE ARE ONLY LOOKIN AT CONTEXT 1
+
+#data at 30 mM Mg
+names_in_subset = TAR_names
+subset_data = sublibs_0_1_ori2.groupby('name')
+condition= ['dG_Mut2_GAAA']
+columns = [context + '_30mM_Mg_ori2' for context in contexts_1]
+data_df_30Mg = pd.DataFrame(0,index = names_in_subset,columns = columns)
+for each_name in data_df_30Mg.index:
+    next_name = subset_data.get_group(each_name)
+    next_name = next_name.set_index('context')
+    next_name = next_name.reindex(contexts_1)
+    dG = next_name[condition]
+    data_df_30Mg.loc[each_name] = [item for sublist in dG.values.tolist() for item in sublist]
+#
+#data at 5 mM Mg
+condition= ['dG_Mut2_GAAA_5mM_2']
+columns = [context + '_5mM_Mg_ori2' for context in contexts_1]
+
+data_df_5Mg = pd.DataFrame(0,index = names_in_subset,columns = columns)
+for each_name in data_df_30Mg.index:
+    next_name = subset_data.get_group(each_name)
+    next_name = next_name.set_index('context')
+    next_name = next_name.reindex(contexts_1)
+    dG = next_name[condition]
+    data_df_5Mg.loc[each_name] = [item for sublist in dG.values.tolist() for item in sublist]
+
+#data at 5 mM Mg + 150 mM K
+condition= ['dG_Mut2_GAAA_5mM_150mMK_1']
+columns = [context + '_5mM_Mg_150K_ori2' for context in contexts_1]
+
+data_df_5Mg150K = pd.DataFrame(0,index = names_in_subset,columns = columns)
+for each_name in data_df_30Mg.index:
+    next_name = subset_data.get_group(each_name)
+    next_name = next_name.set_index('context')
+    next_name = next_name.reindex(contexts_1)
+    dG = next_name[condition]
+    data_df_5Mg150K.loc[each_name] = [item for sublist in dG.values.tolist() for item in sublist]    
+
+
+#data at 30 mM Mg with a GUAA tetraloop
+condition= ['dG_Mut2_GUAA_1']
+columns = [context + '_GUAA_ori2' for context in contexts_1]
+data_df_GUAA = pd.DataFrame(0,index = names_in_subset,columns = columns)
+for each_name in data_df_30Mg.index:
+    next_name = subset_data.get_group(each_name)
+    next_name = next_name.set_index('context')
+    next_name = next_name.reindex(contexts_1)
+    dG = next_name[condition]
+    data_df_GUAA.loc[each_name] = [item for sublist in dG.values.tolist() for item in sublist]
+
+
+#concatenate data at all conditions 
+data_34_contexts = pd.concat([data_df_30Mg,data_df_5Mg,data_df_5Mg150K,data_df_GUAA],axis = 1)
+#data_34_contexts = pd.concat([data_df_30Mg,data_df_5Mg,data_df_5Mg150K],axis = 1)
+#data_34_contexts = pd.concat([data_df_30Mg,data_df_5Mg],axis = 1)
+#data_34_contexts = data_df_30Mg
+#%% run this one first to copy to dataframe and then go back and select orientation 2
+data_34_contexts_ori1 = data_34_contexts.copy()
+#%%
+data_34_contexts_ori2 = data_34_contexts.copy()
+#%%
+data_34_contexts = pd.concat([data_34_contexts_ori1,data_34_contexts_ori2],axis = 1)
+#%%
+data_34
+
+
+
+
+
+
+
+
+
+
+#%%
+#keep track of which values are limits
+limit_values = data_34_contexts > dG_threshold
+nan_values = data_34_contexts.isna()
+#replace values above limit by limit
+data_34_thres = data_34_contexts.copy()
+data_34_thres[limit_values] = dG_threshold
+#interpolate missing_data
+number_nans = data_34_thres.isna().sum().sum()
+#%%
+print('initial number of missing values:' + str(data_34_thres.isna().sum().sum()))
+data_34_interp = data_34_thres.copy()
+while number_nans > 0:
+    data_34_interp, B = interpolate_mat_knn(data_34_interp,max_num_to_average = 2)
+    number_nans = data_34_interp.isna().sum().sum()
+print('final number of missing values:' + str(number_nans))
+#%%
+#%cluster wrt data subtracted by average across rows
+#normalized data
+avg_row = data_34_interp.mean(axis=1)
+norm_data_34 = data_34_interp.sub(avg_row,axis='rows')
+#reinsert nans
+norm_data_34_nan = norm_data_34.copy()
+norm_data_34_nan[nan_values] = np.nan
+#
+num_PCA = 9
+#8
+pca,transformed,loadings = doPCA(norm_data_34)
+#plot explained variance by PC
+plt.figure()
+pd.Series(pca.explained_variance_ratio_).plot(kind='bar')
+plt.ylabel('fraction of variance \nexplained by each PC', fontsize=14)
+
+plt.tight_layout()
+print('Fraction explained by the first ',str(num_PCA), 'PCAs :',sum(pca.explained_variance_ratio_[:num_PCA]))
+list_PCAs = list(transformed.columns[:num_PCA])
+z_pca = sch.linkage(transformed.loc[:,list_PCAs],method='ward',optimal_ordering=True) 
+X = transformed.loc[:,list_PCAs]
+c, coph_dists = cophenet(z_pca, pdist(X))
+print('cophenetic distance: ',c)
+
+cg = sns.clustermap(norm_data_34_nan,row_linkage= z_pca,col_cluster=False,cmap ='coolwarm',
+                    vmin = -4, vmax = 2.5)#
+
+#%cluster wrt data subtracted by average across rows
+distance_threshold = 6
+plt.plot()
+sch.dendrogram(z_pca,color_threshold=distance_threshold)
+max_d = distance_threshold
+
+clusters = fcluster(z_pca, max_d, criterion='distance')
+number_clusters = max(clusters)
+print('number of clusters based on distance of ',str(max_d), ':', str(number_clusters))
+# Append cluster number to dataframe with data
+clustered_data = norm_data_34_nan.copy()
+cluster_series = pd.Series(clusters,index=clustered_data.index)
+clustered_data['cluster'] = cluster_series
+#Replot clustergram with rows colored as above
+row_color = pd.Series(clusters,index=clustered_data.index)
+cluster_colors = ['g','r','c','m','y','k','b','orange','g','r','c','m','y','k','b']
+num_clusters = len(cluster_series.unique())
+num_clusters
+for i in range(num_clusters):
+    row_color[row_color == (i+1)] = cluster_colors[i]
+cg = sns.clustermap(norm_data_34_nan,row_linkage=z_pca, col_cluster=False
+                    ,row_cluster=True, row_colors = row_color,cmap ='coolwarm',
+                    vmin = -4, vmax = 2.5)#
+#cg.savefig('/Volumes/NO NAME/Clustermaps/TAR.svg')
+
+
+cg = sns.clustermap(data_34_thres.reindex(norm_data_34_nan.index),row_linkage=z_pca, col_cluster=False
+                    ,row_cluster=True, row_colors = row_color, cmap = 'Blues_r', vmin = -12, vmax = -7)
+#cg.savefig('/Volumes/NO NAME/Clustermaps/original_dG_TAR.svg')
+cg = sns.clustermap(avg_row,row_linkage=z_pca, col_cluster=False
+                    ,row_cluster=True, row_colors = row_color,cmap ='Blues_r',
+                    vmin = -9, vmax=-8)#
+#cg.savefig('/Volumes/NO NAME/Clustermaps/TAR_avg.svg')
+
+
+#%%
+#cluster wrt to original dGs
+
+num_PCA = 8
+#8
+pca,transformed,loadings = doPCA(data_34_interp)
+#plot explained variance by PC
+plt.figure()
+pd.Series(pca.explained_variance_ratio_).plot(kind='bar')
+plt.ylabel('fraction of variance \nexplained by each PC', fontsize=14)
+plt.tight_layout()
+print('Fraction explained by the first ',str(num_PCA), 'PCAs :',sum(pca.explained_variance_ratio_[:num_PCA]))
+
+#
+list_PCAs = list(transformed.columns[:num_PCA])
+z_pca = sch.linkage(transformed.loc[:,list_PCAs],method='ward',optimal_ordering=True) 
+X = transformed.loc[:,list_PCAs]
+c, coph_dists = cophenet(z_pca, pdist(X))
+print('cophenetic distance: ',c)
+
+cg = sns.clustermap(data_34_interp,row_linkage= z_pca,col_cluster=False,cmap ='Blues_r')#
+
+#%%
+
+distance_threshold = 6
+plt.plot()
+sch.dendrogram(z_pca,color_threshold=distance_threshold)
+max_d = distance_threshold
+
+clusters = fcluster(z_pca, max_d, criterion='distance')
+number_clusters = max(clusters)
+print('number of clusters based on distance of ',str(max_d), ':', str(number_clusters))
+# Append cluster number to dataframe with data
+clustered_data = norm_data_34_nan.copy()
+cluster_series = pd.Series(clusters,index=clustered_data.index)
+clustered_data['cluster'] = cluster_series
+#Replot clustergram with rows colored as above
+row_color = pd.Series(clusters,index=clustered_data.index)
+cluster_colors = ['g','r','c','m','y','k','b','orange','g','r','c','m','y','k','b']
+num_clusters = len(cluster_series.unique())
+num_clusters
+for i in range(num_clusters):
+    row_color[row_color == (i+1)] = cluster_colors[i]
+cg = sns.clustermap(norm_data_34_nan,row_linkage=z_pca, col_cluster=False
+                    ,row_cluster=True, row_colors = row_color,cmap ='coolwarm',
+                    vmin = -4, vmax = 2.5)#
+#cg.savefig('/Volumes/NO NAME/Clustermaps/TAR.svg')
+
+
+cg = sns.clustermap(data_34_thres.reindex(norm_data_34_nan.index),row_linkage=z_pca, col_cluster=False
+                    ,row_cluster=True, row_colors = row_color, cmap = 'Blues_r', vmin = -12, vmax = -7)
+#cg.savefig('/Volumes/NO NAME/Clustermaps/original_dG_TAR.svg')
+cg = sns.clustermap(avg_row,row_linkage=z_pca, col_cluster=False
+                    ,row_cluster=True, row_colors = row_color,cmap ='Blues_r',
+                    vmin = -9, vmax=-8)#
+#cg.savefig('/Volumes/NO NAME/Clustermaps/TAR_avg.svg')
+
+
+
+
+
+
+
+
+
+
+
+
+#%%
+a = norm_data_34.loc['WT_2C'].values
+print(a.shape)
+a = a.reshape(1, -1)
+print(a.shape)
+b = norm_data_34.loc['WT_2U'].values
+b  = b.reshape(1, -1)
+d = euclidean_distances(a,b)
+#%%
+C = clustered_data.copy()
+C = C.sort_values('cluster')
+
+
+
+
+#%%taking only the 5 contexts that were common to all TAR sequences 
+subset_data = TAR_lib[TAR_lib['context'].isin(contexts_2)]
+names_in_subset = list(set(subset_data['full_name']))
+names_in_subset.pop(0)
+subset_data = subset_data.groupby('full_name')
+number_orientations_list= []
+for each_name in names_in_subset:
+    next_name = subset_data.get_group(each_name)
+    junctions = next_name['junction_seq']
+    number_orientations = len(set(junctions))
+    number_orientations_list.append(number_orientations)
+
+no_orientations_df = pd.DataFrame(index = names_in_subset)
+no_orientations_df['number'] = number_orientations_list
+#%%
+#data at 30 mM Mg
+condition= ['dG_Mut2_GAAA']
+columns = [context + '_30mM_Mg' for context in contexts_2]
+
+data_df_30Mg = pd.DataFrame(0,index = names_in_subset,columns = columns)
+for each_name in data_df_30Mg.index:
+    next_name = subset_data.get_group(each_name)
+    next_name = next_name.set_index('context')
+    next_name = next_name.reindex(contexts_2)
+    dG = next_name[condition]
+    data_df_30Mg.loc[each_name] = [item for sublist in dG.values.tolist() for item in sublist]
+
+#data at 5 mM Mg
+condition= ['dG_Mut2_GAAA_5mM_2']
+columns = [context + '_5mM_Mg' for context in contexts_2]
+
+data_df_5Mg = pd.DataFrame(0,index = names_in_subset,columns = columns)
+for each_name in data_df_30Mg.index:
+    next_name = subset_data.get_group(each_name)
+    next_name = next_name.set_index('context')
+    next_name = next_name.reindex(contexts_2)
+    dG = next_name[condition]
+    data_df_5Mg.loc[each_name] = [item for sublist in dG.values.tolist() for item in sublist]
+
+#data at 5 mM Mg + 150 mM K
+condition= ['dG_Mut2_GAAA_5mM_150mMK_1']
+columns = [context + '_5mM_Mg_150K' for context in contexts_2]
+
+data_df_5Mg150K = pd.DataFrame(0,index = names_in_subset,columns = columns)
+for each_name in data_df_30Mg.index:
+    next_name = subset_data.get_group(each_name)
+    next_name = next_name.set_index('context')
+    next_name = next_name.reindex(contexts_2)
+    dG = next_name[condition]
+    data_df_5Mg150K.loc[each_name] = [item for sublist in dG.values.tolist() for item in sublist]    
+
+
+#data at 30 mM Mg with a GUAA tetraloop
+condition= ['dG_Mut2_GUAA_1']
+columns = [context + '_GUAA' for context in contexts_2]
+data_df_GUAA = pd.DataFrame(0,index = names_in_subset,columns = columns)
+for each_name in data_df_30Mg.index:
+    next_name = subset_data.get_group(each_name)
+    next_name = next_name.set_index('context')
+    next_name = next_name.reindex(contexts_2)
+    dG = next_name[condition]
+    data_df_GUAA.loc[each_name] = [item for sublist in dG.values.tolist() for item in sublist]
+
+
+#concatenate data at all conditions 
+data_5_contexts = pd.concat([data_df_30Mg,data_df_5Mg,data_df_5Mg150K,data_df_GUAA],axis = 1)
+data_5_contexts = pd.concat([data_df_30Mg,data_df_5Mg,data_df_5Mg150K],axis = 1)
+#data_5_contexts = pd.concat([data_df_30Mg,data_df_5Mg],axis = 1)
+data_5_contexts = data_df_30Mg
+#%% prepare data for clustering 
+
+#USE ORIGINAL DATA WITHOUT NORMALIZATION
+use_original = False
+
+below_lim_mask = data_5_contexts > dG_threshold
+data_5_contexts_thr = data_5_contexts.copy()
+data_5_contexts_thr[below_lim_mask] = dG_threshold
+nan_mask = data_5_contexts_thr.isna()
+data_5_contexts_thr_interp,B = interpolate_mat_knn(data_5_contexts_thr)
+#normalize the data by the mean across each row
+mean_per_row = data_5_contexts_thr_interp.mean(axis = 1)
+data_5_normalized = data_5_contexts_thr_interp.sub(mean_per_row,axis = 0)
+
+data_5_original_nan = data_5_normalized.copy()
+
+if use_original:
+    data_5_original_nan = data_5_contexts_thr_interp.copy()
+    data_5_normalized = data_5_contexts_thr_interp.copy()
+
+data_5_original_nan[nan_mask] = np.nan
+num_PCA = 3
+pca,transformed,loadings = doPCA(data_5_normalized)
+#plot explained variance by PC
+plt.figure()
+pd.Series(pca.explained_variance_ratio_).plot(kind='bar')
+plt.ylabel('fraction of variance \nexplained by each PC', fontsize=14)
+plt.tight_layout()
+print('Fraction explained by the first ',str(num_PCA), 'PCAs :',sum(pca.explained_variance_ratio_[:num_PCA]))
+list_PCAs = list(transformed.columns[:num_PCA])
+z_pca = sch.linkage(transformed.loc[:,list_PCAs],method='ward',optimal_ordering=True) 
+X = transformed.loc[:,list_PCAs]
+c, coph_dists = cophenet(z_pca, pdist(X))
+print('cophenetic distance: ',c)
+#%%
+cg = sns.clustermap(data_5_original_nan,row_linkage= z_pca,col_cluster=False)#,cmap='coolwarm',
+                    #vmin = -3.5, vmax = 3.5)
+
+distance_threshold = 10
+plt.plot()
+#sch.dendrogram(z_pca,color_threshold=distance_threshold)
+max_d = distance_threshold
+clusters = fcluster(z_pca, max_d, criterion='distance')
+number_clusters = max(clusters)
+print('number of clusters based on distance of ',str(max_d), ':', str(number_clusters))
+# Append cluster number to dataframe with data
+clustered_data = data_5_original_nan.copy()
+cluster_series = pd.Series(clusters,index=clustered_data.index)
+clustered_data['cluster'] = cluster_series
+#Replot clustergram with rows colored as above
+row_color = pd.Series(clusters,index=clustered_data.index)
+cluster_colors = ['g','r','c','m','y','k','b','orange','g','r','c','m','y','k','b']
+num_clusters = len(cluster_series.unique())
+num_clusters
+for i in range(num_clusters):
+    row_color[row_color == (i+1)] = cluster_colors[i]
+cg = sns.clustermap(data_5_original_nan,row_linkage=z_pca, col_cluster=False
+                        ,row_cluster=True, row_colors = row_color,)#vmin=-3.5,vmax=3.5,cmap='coolwarm',
+                        
+##
+#%%
+#sort the data so can look at different clusters
+WT_sequence = 'AUCUGA_UCU_WT_TAR'
+
+C = clustered_data.copy()
+C = C.sort_values('cluster')
+
+#%%
+classes = pd.DataFrame(index = data_5_original_nan.index)
+classes['WT_bulge'] = 0
+classes['1Cbulge'] = 0
+classes['2Cbulge'] = 0
+classes['3Cbulge'] = 0
+classes['4Cbulge'] = 0
+classes['1Ubulge'] = 0
+classes['2Ubulge'] = 0
+classes['3Ubulge'] = 0
+classes['4Ubulge'] = 0
+
+
+for each_junction in classes.index:
+    if 'WTbulge' in each_junction:
+        classes.loc[each_junction]['WT_bulge'] = 1
+    if '1Cbulge' in each_junction:
+        classes.loc[each_junction]['1Cbulge'] = 1
+    if '2Cbulge' in each_junction:
+        classes.loc[each_junction]['2Cbulge'] = 1
+    if '3Cbulge' in each_junction:
+        classes.loc[each_junction]['3Cbulge'] = 1        
+    if '4Cbulge' in each_junction:
+        classes.loc[each_junction]['4Cbulge'] = 1        
+
+    if '1Ubulge' in each_junction:
+        classes.loc[each_junction]['1Ubulge'] = 1
+    if '2Ubulge' in each_junction:
+        classes.loc[each_junction]['2Ubulge'] = 1
+    if '3Ubulge' in each_junction:
+        classes.loc[each_junction]['3Ubulge'] = 1        
+    if '4Ubulge' in each_junction:
+        classes.loc[each_junction]['4Ubulge'] = 1           
+
+classes = classes[['WT_bulge','1Cbulge','1Ubulge','2Cbulge','2Ubulge','3Cbulge','3Ubulge',
+                   '4Cbulge','4Ubulge']]
+        
+cg = sns.clustermap(classes,row_linkage=z_pca, col_cluster=False
+                        ,row_cluster=True, vmin=0,vmax=1,cmap='Greys',
+                        row_colors = row_color)
+
+
+#%%
+
+flanking_df = pd.DataFrame(index = classes.index)
+
+flanking_sequence = ['topAU_botAU','topAU_botUA','topAU_botGU','topAU_botUG','topAU_botGC','topAU_botCG',
+'topGC_botAU','topGC_botUA','topGC_botGU','topGC_botUG','topGC_botGC','topGC_botCG',
+'topCG_botAU','topCG_botUA','topCG_botGU','topCG_botUG','topCG_botGC','topCG_botCG',
+'topUA_botAU','topUA_botUA','topUA_botGU','topUA_botUG','topUA_botGC','topUA_botCG',
+'topGU_botAU','topGU_botUA','topGU_botGU','topGU_botUG','topGU_botGC','topGU_botCG',
+'topUG_botAU','topUG_botUA','topUG_botGU','topUG_botUG','topUG_botGC','topUG_botCG']
+
+for each_sequence in flanking_sequence:
+    flanking_df[each_sequence] = 0
+
+for each_sequence in flanking_sequence:
+    for each_TAR in flanking_df.index:
+        if each_sequence in each_TAR:
+            flanking_df.loc[each_TAR][each_sequence] = 1
+#%%
+cg = sns.clustermap(flanking_df,row_linkage=z_pca, col_cluster=False
+                        ,row_cluster=True, vmin=0,vmax=1,cmap='Greys')
+
+
+#%%
+cg = sns.clustermap(below_lim_mask.astype(int),row_linkage= z_pca,col_cluster=False,cmap = 'Greys')
+
+
+
+
+#%%
+cg = sns.clustermap(data_5_normalized,method = 'ward',cmap = 'coolwarm')
+#%%
+cg = sns.clustermap(data_5_contexts_thr_interp,row_linkage= z_pca,col_cluster=False)
+#%%
+
+
+WT_TAR = sublib0[sublib0['name'] == 'WT_AGA_control']
+
+
+
+
+#%%
+condition = 'dG_Mut2_GAAA'
+sublib0_name = sublib0.groupby('name')
+unique_names_sublib0 = list(set(sublib0['name']))
+
+columns_df = [next_context + '_2' for next_context in contexts_0]
+
+data_sublib0 = pd.DataFrame(0,index =unique_names_sublib0,columns = columns_df)
+
+for group in data_sublib0.index:
+    #get each of the variants form sublibrary 0
+    next_name = sublib0_name.get_group(group)
+    #now group them by sequence (because they are flipped)    
+    next_name_seq = next_name.groupby('junction_seq')
+    
+    data = []
+    data2 = []
+    for sequences in next_name_seq.groups:
+        next_sequence = next_name_seq.get_group(sequences)
+        next_sequence = next_sequence.set_index('context')
+        next_sequence = next_sequence.reindex(contexts_0)
+        data.append(next_sequence[condition].values)
+        data2 = [item for sublist in data for item in sublist ]
+    data_sublib0.loc[group] = data2
 #%%
 unique_names = list(set(TAR_lib['name']))
+unique_names.pop(0)
+unique_full_name = list(set(TAR_lib['full_name']))
 #there are 400 unique names
 unique_tar_sequence = list(set(TAR_lib['junction_seq']))
 #there are 462 unique tar sequences --> some sequences were given the same name.
 #%%
+contexts_0 = list(set(sublib0['context']))
+contexts_1 = list(set(sublib1['context']))
+contexts_2 = list(set(sublib2['context']))
+#%% Start with contexts that are common to all of them (contexts_2)
+name_group = TAR_lib.groupby('name')
+columns = list(range(10))
+columns = [str(a) for a in columns]
+columns = ['name'] +['junction_seq'] + columns
+#%%
+#how many have flipped
+number_contexts = pd.DataFrame(index = unique_names)
+for names in name_group.groups:
+    next_group = name_group.get_group(names)
+    sequence_group = next_group.groupby('junction_seq')
+    print(sequence_group['dG_Mut2_GAAA'].aggregate('count'))
+#%%
+conditions = 'dG_Mut2_GAAA'
+common_data = pd.DataFrame(0, index = unique_names, columns = columns)
+for names in name_group.groups:
+    next_group = name_group.get_group(names)
+    sequence_group = next_group.groupby('junction_seq')
+    A = []
+    for sequences in sequence_group.groups:
+        next_sequence = sequence_group.get_group(sequences)
+        next_sequence = next_sequence.set_index('context')
+        next_sequence = next_sequence.reindex(contexts_2)
+        A.append(next_sequence[conditions].values)
+'common_data.loc[name1][common_data.columns[0:5]]'    
+    #next_group = next_group.set_index('context')
+    #next_group = next_group.reindex(contexts_2)
+#%%
+conditions = 'dG_Mut2_GAAA'
+no_contexts = pd.DataFrame(index = unique_names)
+number = []
+for names in no_contexts.index:
+    next_group = name_group.get_group(names)
+    a = next_group.groupby('context')
+    number.append(a['index'].aggregate('count').sum())
+#%%
 TAR_lib_grouped = TAR_lib.groupby('name')
+#%%
+WT_TAR = TAR_lib_grouped.get_group('WT_TAR').copy()
+
+#%%
+WT_TAR['context'] = WT_TAR['length'] + '_' + WT_TAR['helix_one_length']
 
 
 

@@ -39,7 +39,6 @@ num_neighbors = 10 # for interpolation
 #Data has been separated into 11ntR, IC3, and in vitro
 data_path = '/Users/Steve/Desktop/Data_analysis_code/Data/'
 entire_lib = pd.read_csv(data_path + 'tectorna_results_tertcontacts.180122.csv')
-
 #%%
 sublib0 = entire_lib[entire_lib['sublibrary'] =='tertcontacts_0']
 sublib0_group = sublib0.groupby('r_name')
